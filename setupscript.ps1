@@ -15,7 +15,7 @@ while (!$broughtOnline -and ($retryCount -lt 120)) {
     catch {
         Write-host "Wait for 5 secs and then retry"
         ++$retryCount
-        sleep 5
+        Start-Sleep 5
     }
 }
 
