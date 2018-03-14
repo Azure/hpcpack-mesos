@@ -1,9 +1,10 @@
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 import json
-import threading
-from heartbeat_table import HeartBeatTable
-import logging_aux
 import logging
+import threading
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+
+import logging_aux
+from heartbeat_table import HeartBeatTable
 
 
 class RestServer(object):  # TODO: replace this implementation with twisted based implementation

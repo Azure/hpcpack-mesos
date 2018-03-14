@@ -1,7 +1,7 @@
 import threading
 from collections import namedtuple
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
+
 import logging_aux
 
 
@@ -62,7 +62,7 @@ class HeartBeatTable(object):
         provision_timeout_list = []
         heartbeat_timeout_list = []
         running_list = []
-        for host in dict(self._table):
+        for host in dict(self._table).itervalues():
             if host.state == HpcState.Provisioning and now - host.heartbeat_timeout >= self._provisioning_timeout:
                 provision_timeout_list.append(host)
             elif host.state == HpcState.Running:
@@ -74,7 +74,7 @@ class HeartBeatTable(object):
 
     def get_cores_in_provisioning(self):
         cores = 0.0
-        for host in dict(self._table):
+        for host in dict(self._table).itervalues():
             if host.state == HpcState.Provisioning:
                 cores += host.cpus
         return cores

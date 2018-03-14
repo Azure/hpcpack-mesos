@@ -85,7 +85,7 @@ class Test(object):
     def status_update(self, update):
         # if update['status']['state'] == 'TASK_RUNNING':
         #     self.driver.kill(update['status']['agent_id']['value'], update['status']['task_id']['value'])
-        self.logger.log("Update received:\n{}".format(str(update)))
+        self.logger.info("Update received:\n{}".format(str(update)))
 
     def offer_received(self, offers):
         # self.logger.info('OFFER: %s' % (str(offers)))
