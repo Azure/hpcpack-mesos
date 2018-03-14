@@ -44,12 +44,18 @@ class Test(object):
 
         self.hpc_client = AutoScaleRestClient()
         self.core_provisioning = 0.0
+
+        '''
         with open("setupscript.ps1") as scriptfile:
             hpc_setup_ps1 = scriptfile.read()
-        self.logger.info("Loaded HPC setup script:\n{}".format(hpc_setup_ps1))
-        hpc_setup_ps1_utf16 = hpc_setup_ps1.encode('utf-16')
-        hpc_setup_ps1_utf16_nobom = hpc_setup_ps1_utf16[2:] if hpc_setup_ps1_utf16[0:2] == codecs.BOM_UTF16 else hpc_setup_ps1_utf16
-        self.hpc_setup_ps1_b64 = base64.b64encode(hpc_setup_ps1_utf16_nobom)
+        with open("daemon.ps1") as daemonFile:
+            hpc_daemon_ps1 = daemonFile.read()
+        self.logger.debug("Loaded HPC daemon script:\n{}".format(hpc_setup_ps1))
+        hpc_daemon_ps1_b64 = self.__encode_utf16b64(hpc_daemon_ps1)
+        hpc_setup_fromed = hpc_setup_ps1.replace("$$encodedDaemonScript", '"' + hpc_daemon_ps1_b64 + '"')
+        self.logger.debug("Loaded and formed HPC setup script:\n{}".format(hpc_setup_fromed))
+        self.hpc_setup_ps1_b64 = self.__encode_utf16b64(hpc_setup_fromed)
+        '''
 
         self.driver = None  # type: MesosClient.SchedulerDriver
         self.mesos_client = MesosClient(mesos_urls=['http://172.16.1.4:5050'])
@@ -69,6 +75,12 @@ class Test(object):
             except KeyboardInterrupt:
                 self.shutdown()
                 break
+
+    def __encode_utf16b64(self, content):
+        utf16 = content.encode('utf-16')
+        utf16_nobom = utf16[2:] if utf16[0:2] == codecs.BOM_UTF16 else utf16
+        utf16_b64 = base64.b64encode(utf16_nobom)
+        return utf16_b64
 
     def shutdown(self):
         print 'Stop requested by user, stopping framework....'
@@ -154,7 +166,7 @@ class Test(object):
                     'scalar': {'value': self.get_scalar(offer['resources'], 'mem')}
                 }
             ],
-            'command': {'value': 'powershell -EncodedCommand ' + self.hpc_setup_ps1_b64}
+            'command': {'value': 'powershell -EncodedCommand ' + self.hpc_setup_ps1_b64 + " > setupscript.log"}
         }
         self.logger.debug("Sending command:\n{}".format(task['command']['value']))
         mesos_offer.accept([task])
