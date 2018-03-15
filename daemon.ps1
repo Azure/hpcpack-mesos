@@ -4,7 +4,20 @@ if (!$CreatedMutex) {
     $mutex.WaitOne()
 }
 
-write-output "Mutex entered. Stopping HPC Services"
+write-output "Mutex entered. Deleting HPC Node"
+
+try {
+    Add-PSSnapin microsoft.hpc
+    $hstnm = hostname
+    $node = Get-HpcNode -Name $hstnm
+    Set-HpcNodeState -Node $node -State offline
+    Remove-HpcNode -Node $node        
+}
+catch {
+    $_        
+}
+
+write-output "Stopping HPC Service"
     
 # HPC Head node Service
 sc.exe stop HpcMonitoringServer 
@@ -25,6 +38,8 @@ sc.exe stop HpcBroker
 
 # Other HPC service depend on SDM
 sc.exe stop HpcSdm 
-	
+
+schtasks /delete /tn mesoshpcdaemon /f
+
 $mutex.ReleaseMutex()
 $mutex.Close()
