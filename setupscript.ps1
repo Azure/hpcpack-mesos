@@ -14,14 +14,14 @@ if (!$CreatedMutex) {
 
 Write-Output "Mutex entered"
 
-$encodeddaemonScript
-$s = "powershell -WindowStyle Hidden -file " + (Split-Path -parent $myinvocation.mycommand.path) + "\daemon.ps1"
+$s = "powershell -WindowStyle Hidden -file " + (Split-Path -parent $myinvocation.mycommand.path) + "\daemon.ps1 > C:\deamon.log"
 $s
 schtasks /create /tn mesoshpcdaemon /tr $s /sc onstart /f
 schtasks /run /tn mesoshpcdaemon
 
 $setupPath
 $setupProc = Start-Process $setupPath -ArgumentList "-unattend -computenode:$headnode -sslthumbprint:$sslthumbprint" -PassThru
+#$setupProc = Start-Process "C:\HPCPack2016\private.20180308.251b491.release.debug\release.debug\setup.exe" -ArgumentList "-unattend -computenode:mesoswinagent -sslthumbprint:0386B1198B956BBAAA4154153B6CA1F44B6D1016" -PassThru
 $setupProc.WaitForExit()
 
 Write-Output "Start HPC Services if not already"
@@ -45,15 +45,18 @@ sc.exe start HpcBroker
 # Other HPC service depend on SDM
 sc.exe start HpcSdm 
 
-Add-PSSnapin microsoft.hpc
-$hstnm = hostname
+Write-Output "Bring HPC Node online"
 
+<#
+$daemonScript = '$hstnm = hostname
 $broughtOnline = $false
 $retryCount = 0
+
 while (!$broughtOnline -and ($retryCount -lt 120)) {
     try {
-        $node = Get-HpcNode -Name $hstnm
-        Set-HpcNodeState -Node $node -State online
+		Add-PSSnapin microsoft.hpc
+		Write-Output "HPC PSSnapin loaded."        
+        Set-HpcNodeState -Name $hstnm -State online
         $broughtOnline = $true
     }
     catch {
@@ -62,7 +65,20 @@ while (!$broughtOnline -and ($retryCount -lt 120)) {
         ++$retryCount
         Start-Sleep 5
     }
-}
+}'
+$bytes = [System.Text.Encoding]::Unicode.GetBytes($daemonScript)
+$encodeddaemonScript = [Convert]::ToBase64String($bytes)
+
+$bringOnlineProc = Start-Process "Powershell.exe" -ArgumentList ('-noexit -encodedCommand ' + $encodeddaemonScript) -PassThru
+
+$bringOnlineProc.WaitForExit()
+#>
+
+$s = "powershell -file " + (Split-Path -parent $myinvocation.mycommand.path) + "\bringOnline.ps1"
+#$s = "powershell -noexit -file c:\hpcpack2016\bringOnline.ps1"
+$s
+schtasks /create /tn mesoshpconline /tr $s /sc onstart /f
+schtasks /run /tn mesoshpconline
 
 $heartBeatParams = @{"hostname" = hostname} | ConvertTo-Json
 $url = "http://" + $frameworkUri + ":8088"
@@ -76,9 +92,11 @@ while ($true) {
         # }
         $daemonRunning = schtasks /query /tn mesoshpcdaemon | findstr Running
         if (!$daemonRunning) {
+            Write-Output "Daemon script not found. Restart."
             schtasks /run /tn mesoshpcdaemon
         }
-
+		
+        Write-Output "Send HeartBeat"
         Invoke-WebRequest -Method Post $url -Body $heartBeatParams
     }
     catch {
