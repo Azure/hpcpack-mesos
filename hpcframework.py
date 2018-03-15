@@ -177,7 +177,7 @@ class Test(object):
         }
         self.logger.debug("Sending command:\n{}".format(task['command']['value']))
         mesos_offer.accept([task])
-        self.heartbeat_table.add_slaveinfo(hostname, agent_id, task, cpus)
+        self.heartbeat_table.add_slaveinfo(hostname, agent_id, task_id, cpus)
 
 
 if __name__ == "__main__":
