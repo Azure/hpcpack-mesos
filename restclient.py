@@ -32,7 +32,7 @@ class AutoScaleRestClient(object):
         url = self.check_nodes_idle_route.format(self.hostname)
         res = requests.post(url, data=nodes, headers=headers, verify=False)
         if res.ok:
-            self.logger.info(res.content)
+            self.logger.info("check_nodes_idle:" + res.content)
             jobjs = json.loads(res.content)
             return [IdleNode(idle_info['NodeName'], idle_info['IdleSince']) for idle_info in jobjs]
         else:

@@ -1,5 +1,6 @@
 import base64
 import codecs
+import itertools
 import json
 import logging
 import os
@@ -21,7 +22,7 @@ import restserver
 from restclient import AutoScaleRestClient
 
 
-class Test(object):
+class HpcpackFramwork(object):
     class MesosFramework(threading.Thread):
         def __init__(self, client):
             threading.Thread.__init__(self)
@@ -68,11 +69,13 @@ class Test(object):
         self.mesos_client.on(MesosClient.SUBSCRIBED, self.subscribed)
         self.mesos_client.on(MesosClient.OFFERS, self.offer_received)
         self.mesos_client.on(MesosClient.UPDATE, self.status_update)
-        self.th = Test.MesosFramework(self.mesos_client)
+        self.th = HpcpackFramwork.MesosFramework(self.mesos_client)
         self.th.start()
 
         self.heartbeat_server = restserver.RestServer(self.heartbeat_table, 8088)
         self.heartbeat_server.start()
+
+        self.check_runaway_and_idle_slave()
 
         while True and self.th.isAlive():
             try:
@@ -150,12 +153,12 @@ class Test(object):
         offer = mesos_offer.get_offer()
         self.logger.info("Accepting offer: {}".format(str(offer)))
         agent_id = offer['agent_id']['value']
-        hostname = offer['hostname']
+        fqdn = offer['hostname']
         task_id = uuid.uuid4().hex
         cpus = self.get_scalar(offer['resources'], 'cpus')
 
         task = {
-            'name': 'sample test',
+            'name': 'hpc pack mesos cn',
             'task_id': {'value': task_id},
             'agent_id': {'value': agent_id},
             'resources': [
@@ -177,13 +180,45 @@ class Test(object):
         }
         self.logger.debug("Sending command:\n{}".format(task['command']['value']))
         mesos_offer.accept([task])
-        self.heartbeat_table.add_slaveinfo(hostname, agent_id, task_id, cpus)
+        self.heartbeat_table.add_slaveinfo(fqdn, agent_id, task_id, cpus)
+
+    def __kill_task(self, host):
+        self.logger.debug("Killing task {} on host {}".format(host.task_id, host.fqdn))
+        self.driver.kill(host.agent_id, host.task_id)
+        self.heartbeat_table.on_slave_close(host.hostname)
+
+    def __kill_task_by_hostname(self, hostname):
+        (task_id, agent_id) = self.heartbeat_table.get_task_info(hostname)
+        if task_id != "":
+            self.logger.debug("Killing task {} on host {}".format(task_id, hostname))
+            self.driver.kill(agent_id, task_id)
+            self.heartbeat_table.on_slave_close(hostname)
+        else:
+            self.logger.warn("Task info for host {} not found".format(hostname))
+
+    def check_runaway_and_idle_slave(self):
+        (provision_timeout_list, heartbeat_timeout_list, running_list) = self.heartbeat_table.check_timeout()
+        self.logger.info("Get provision_timeout_list:{}".format(str(provision_timeout_list)))
+        self.logger.info("Get heartbeat_timeout_list:{}".format(str(heartbeat_timeout_list)))
+        timeout_lists = [provision_timeout_list, heartbeat_timeout_list]
+        for host in itertools.chain(*timeout_lists):
+            self.__kill_task(host)
+
+        running_host_names = [host.hostname for host in running_list]
+        idle_nodes = self.hpc_client.check_nodes_idle(json.dumps(running_host_names))
+        self.logger.info("Get idle_nodes:{}".format(str(idle_nodes)))
+        for idle_node in idle_nodes:
+            self.__kill_task_by_hostname(idle_node.node_name)
+
+        timer = threading.Timer(60.0, self.check_runaway_and_idle_slave)
+        timer.daemon = True
+        timer.start()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # TODO: handle various kinds of input params
     from sys import argv
     if len(argv) == 5:
-        test_mesos = Test(argv[0], argv[1], argv[2], argv[3], argv[4])
+        hpcpack_framework = HpcpackFramwork(argv[0], argv[1], argv[2], argv[3], argv[4])
     else:
-        test_mesos = Test("C:\\HPCPack2016\\setupscript.ps1", "C:\\HPCPack2016\\private.20180308.251b491.release.debug\\release.debug\\setup.exe",
-                          "mesoswinagent", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "172.16.1.5")
+        hpcpack_framework = HpcpackFramwork("C:\\HPCPack2016\\setupscript.ps1", "C:\\HPCPack2016\\private.20180308.251b491.release.debug\\release.debug\\setup.exe",
+                                            "mesoswinagent", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "172.16.1.5")
