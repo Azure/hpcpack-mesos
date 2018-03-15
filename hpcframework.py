@@ -34,11 +34,16 @@ class Test(object):
             except KeyboardInterrupt:
                 print('Stop requested by user, stopping framework....')
 
-    def __init__(self):
+    def __init__(self, script_path, setup_path, headnode, ssl_thumbprint, framework_uri):
         logging.basicConfig()
         self.logger = logging_aux.init_logger_aux("hpcframework", "hpcframework.log")
         # signal.signal(signal.SIGINT, signal.SIG_IGN)
         logging.getLogger('mesoshttp').setLevel(logging.DEBUG)
+        self.script_path = script_path
+        self.setup_path = setup_path
+        self.headnode = headnode
+        self.ssl_thumbprint = ssl_thumbprint
+        self.framework_uri = framework_uri
 
         self.heartbeat_table = heartbeat_table.HeartBeatTable()
 
@@ -166,7 +171,9 @@ class Test(object):
                     'scalar': {'value': self.get_scalar(offer['resources'], 'mem')}
                 }
             ],
-            'command': {'value': 'powershell -EncodedCommand ' + self.hpc_setup_ps1_b64 + " > setupscript.log"}
+            'command': {'value':
+                        'powershell -File ' + self.script_path + " -setupPath " + self.setup_path +
+                        " -headnode " + self.headnode + " -sslthumbprint " + self.ssl_thumbprint + " > setupscript.log"}
         }
         self.logger.debug("Sending command:\n{}".format(task['command']['value']))
         mesos_offer.accept([task])
@@ -174,4 +181,9 @@ class Test(object):
 
 
 if __name__ == "__main__":
-    test_mesos = Test()
+    from sys import argv
+    if len(argv) == 5:
+        test_mesos = Test(argv[0], argv[1], argv[2], argv[3], argv[4])
+    else:
+        test_mesos = Test("C:\\HPCPack2016\\setupscript.ps1", "C:\\HPCPack2016\\private.20180308.251b491.release.debug\\release.debug\\setup.exe",
+                          "mesoswinagent", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "172.16.1.5")
