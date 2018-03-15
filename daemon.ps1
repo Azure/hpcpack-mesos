@@ -3,6 +3,8 @@ $mutex = New-Object -TypeName system.threading.mutex($true, "Global\HpcMesos", [
 if (!$CreatedMutex) {
     $mutex.WaitOne()
 }
+
+write-output "Mutex entered. Stopping HPC Services"
     
 # HPC Head node Service
 sc.exe stop HpcMonitoringServer 
