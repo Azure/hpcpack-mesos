@@ -2,7 +2,7 @@ $hstnm = hostname
 $broughtOnline = $false
 $retryCount = 0
 
-while (!$broughtOnline -and ($retryCount -lt 120)) {
+while (!$broughtOnline) {
     try {
         Add-PSSnapin microsoft.hpc
         Write-Output "HPC PSSnapin loaded."    
@@ -14,7 +14,6 @@ while (!$broughtOnline -and ($retryCount -lt 120)) {
         $broughtOnline = $false
         $_
         Write-Output "Wait for 5 secs and then retry"
-        ++$retryCount
         Start-Sleep 5
     }           
 }

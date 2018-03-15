@@ -80,6 +80,13 @@ $s
 schtasks /create /tn mesoshpconline /tr $s /sc onstart /f
 schtasks /run /tn mesoshpconline
 
+$bringingOnline = schtasks /query /tn mesoshpconline | findstr Running
+while ($bringingOnline) {
+    Write-Output "Still bringing node online. Waiting."
+    Start-Sleep 10
+    $bringingOnline = schtasks /query /tn mesoshpconline | findstr Running
+}
+
 $heartBeatParams = @{"hostname" = hostname} | ConvertTo-Json
 $url = "http://" + $frameworkUri + ":8088"
 
@@ -111,4 +118,3 @@ $mutex.ReleaseMutex()
 $mutex.Close()
 
 exit 0
-
