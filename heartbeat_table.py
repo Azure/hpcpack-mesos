@@ -22,6 +22,7 @@ class HeartBeatTable(object):
             if self._table[hostname].fqdn != u_fqdn:
                 self.logger.error("Duplicated hostname {} detected. Existing fqdn: {}, new fqdn {}. Ignore new heartbeat entry.".format(
                     hostname, self._table[hostname].fqdn, u_fqdn))
+                return
             elif self._table[hostname].state != HpcState.Closed:
                 self.logger.warn("Heart beat entry of {} existed. old value: {}.".format(hostname, str(self._table[hostname])))
         slaveinfo = SlaveInfo(hostname, u_fqdn, agent_id, task_id, cpus, last_heartbeat, HpcState.Provisioning)
@@ -58,6 +59,15 @@ class HeartBeatTable(object):
         else:
             self.logger.error("Host {} is not recognized. Failed to get task info.".format(u_hostname))
             return ("", "")
+
+    def get_host_state(self, hostname):
+        u_hostname = hostname.upper()
+        if u_hostname in self._table:
+            entry = self._table[u_hostname]
+            return entry.state
+        else:
+            self.logger.error("Host {} is not recognized. Failed to get host state.".format(u_hostname))
+            return HpcState.Unknown
 
     def __exec_callback(self, callbacks):
         for callback in callbacks:
@@ -96,4 +106,4 @@ SlaveInfo = namedtuple(
 
 
 class HpcState:
-    Provisioning, Running, Closed = range(3)
+    Unknown, Provisioning, Running, Closed = range(4)
