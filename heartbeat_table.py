@@ -29,10 +29,10 @@ class HeartBeatTable(object):
         self._table[hostname] = slaveinfo
         self.logger.info("Heart beat entry added: {}".format(str(slaveinfo)))
 
-    def on_slave_heartbeat(self, hostname):
+    def on_slave_heartbeat(self, hostname, now=datetime.utcnow()):
         u_hostname = hostname.upper()
         if u_hostname in self._table:
-            self._table[u_hostname] = self._table[u_hostname]._replace(last_heartbeat=datetime.utcnow())
+            self._table[u_hostname] = self._table[u_hostname]._replace(last_heartbeat=now)
             self.logger.info("Heatbeat from host {}".format(u_hostname))
             if self._table[u_hostname].state == HpcState.Provisioning:
                 with self._table_lock:  # to ensure we only run running callback once per entry
