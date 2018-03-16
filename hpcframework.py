@@ -176,7 +176,7 @@ class HpcpackFramwork(object):
             ],
             'command': {'value':
                         'powershell -File ' + self.script_path + " -setupPath " + self.setup_path +
-                        " -headnode " + self.headnode + " -sslthumbprint " + self.ssl_thumbprint + " > setupscript.log"}
+                        " -headnode " + self.headnode + " -sslthumbprint " + self.ssl_thumbprint + " -frameworkUri " + self.framework_uri + " > setupscript.log"}
         }
         self.logger.debug("Sending command:\n{}".format(task['command']['value']))
         mesos_offer.accept([task])
@@ -220,5 +220,5 @@ if __name__ == "__main__":  # TODO: handle various kinds of input params
     if len(argv) == 5:
         hpcpack_framework = HpcpackFramwork(argv[0], argv[1], argv[2], argv[3], argv[4])
     else:
-        hpcpack_framework = HpcpackFramwork("C:\\HPCPack2016\\setupscript.ps1", "C:\\HPCPack2016\\private.20180308.251b491.release.debug\\release.debug\\setup.exe",
+        hpcpack_framework = HpcpackFramwork("Z:\\mesosframework\\setupscript.ps1", "C:\\HPCPack2016\\private.20180308.251b491.release.debug\\release.debug\\setup.exe",
                                             "mesoswinagent", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "172.16.1.5")

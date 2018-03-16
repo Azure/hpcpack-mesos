@@ -103,7 +103,7 @@ while ($true) {
             schtasks /run /tn mesoshpcdaemon
         }
 		
-        Write-Output "Send HeartBeat"
+        Write-Output "Send HeartBeat to"  $url
         Invoke-WebRequest -Method Post $url -Body $heartBeatParams
     }
     catch {
