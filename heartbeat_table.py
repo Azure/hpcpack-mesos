@@ -98,6 +98,7 @@ class HeartBeatTable(object):
         for host in dict(self._table).itervalues():
             if host.state == HpcState.Provisioning:
                 cores += host.cpus
+        self.logger.warn("Cores in provisioning: {}".format(cores))
         return cores
 
 

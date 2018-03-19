@@ -35,7 +35,7 @@ class HpcpackFramwork(object):
             except KeyboardInterrupt:
                 print('Stop requested by user, stopping framework....')
 
-    def __init__(self, script_path, setup_path, headnode, ssl_thumbprint, framework_uri):
+    def __init__(self, script_path="", setup_path="", headnode="", ssl_thumbprint="", framework_uri=""):
         logging.basicConfig()
         self.logger = logging_aux.init_logger_aux("hpcframework", "hpcframework.log")
         # signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -108,30 +108,38 @@ class HpcpackFramwork(object):
         self.logger.info("Update received:\n{}".format(str(update)))
 
     def offer_received(self, offers):
-        # self.logger.info('OFFER: %s' % (str(offers)))
-        grow_decision = self.hpc_client.get_grow_decision()
-        cores_to_grow = grow_decision.cores_to_grow - self.heartbeat_table.get_cores_in_provisioning()
+        try:
+            # self.logger.info('OFFER: %s' % (str(offers)))
+            grow_decision = self.hpc_client.get_grow_decision()
+            if grow_decision is None:
+                cores_to_grow = 0
+            else:
+                cores_to_grow = grow_decision.cores_to_grow - self.heartbeat_table.get_cores_in_provisioning()
 
-        if cores_to_grow > 0:
-            for offer in offers:  # type: Offer
-                mesos_offer = offer.get_offer()
-                self.logger.info("offer_received: {}".format((str(mesos_offer))))
-                if 'attributes' in mesos_offer:
-                    attributes = mesos_offer['attributes']
-                    if self.get_text(attributes, 'os') != 'windows_server':
-                        offer.decline()
-                    else:
-                        cores = self.get_scalar(attributes, 'cores')
-                        cpus = self.get_scalar(mesos_offer['resources'], 'cpus')
-                        if cores == cpus:
-                            self.accept_offer(offer)
-                        else:
+            if cores_to_grow > 0:
+                for offer in offers:  # type: Offer
+                    mesos_offer = offer.get_offer()
+                    self.logger.info("offer_received: {}".format((str(mesos_offer))))
+                    if 'attributes' in mesos_offer:
+                        attributes = mesos_offer['attributes']
+                        if self.get_text(attributes, 'os') != 'windows_server':
                             offer.decline()
-                else:
+                        else:
+                            cores = self.get_scalar(attributes, 'cores')
+                            cpus = self.get_scalar(mesos_offer['resources'], 'cpus')
+                            if cores == cpus:
+                                self.accept_offer(offer)
+                            else:
+                                offer.decline()
+                    else:
+                        offer.decline()
+            else:
+                for offer in offers:
                     offer.decline()
-        else:
-            for offer in offers:
-                offer.decline()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as ex:
+            self.logger.exception(ex)
 
     def accept_offer(self, offer):
         self.logger.info("Offer %s meets HPC's requirement" % offer.get_offer()['id']['value'])
