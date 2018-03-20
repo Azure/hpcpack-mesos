@@ -19,7 +19,7 @@ import heartbeat_table
 import logging_aux
 import restclient
 import restserver
-from restclient import AutoScaleRestClient
+from restclient import HpcRestClient
 
 
 class HpcpackFramwork(object):
@@ -48,7 +48,7 @@ class HpcpackFramwork(object):
 
         self.heartbeat_table = heartbeat_table.HeartBeatTable()
 
-        self.hpc_client = AutoScaleRestClient()
+        self.hpc_client = HpcRestClient()
         self.core_provisioning = 0.0
 
         '''
@@ -70,7 +70,7 @@ class HpcpackFramwork(object):
         self.mesos_client.on(MesosClient.OFFERS, self.offer_received)
         self.mesos_client.on(MesosClient.UPDATE, self.status_update)
         self.th = HpcpackFramwork.MesosFramework(self.mesos_client)
-        self.heartbeat_server = restserver.RestServer(self.heartbeat_table, 8088)
+        self.heartbeat_server = restserver.HeartBeatServer(self.heartbeat_table, 8088)
 
     def start(self):
         self.th.start()

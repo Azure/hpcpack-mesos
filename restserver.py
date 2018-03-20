@@ -7,7 +7,7 @@ import logging_aux
 from heartbeat_table import HeartBeatTable
 
 
-class RestServer(object):  # TODO: replace this implementation with twisted based implementation
+class HeartBeatServer(object):  # TODO: replace this implementation with twisted based implementation
     def __init__(self, heartbeat_table, port=80):
         self.logger = logging_aux.init_logger_aux("hpcframework.heatbeat_server", "hpcframework.heatbeat_server.log")
         self._heartbeat_table = heartbeat_table  # type: HeartBeatTable

@@ -10,7 +10,7 @@ GrowDecision = namedtuple("GrowDecision", "cores_to_grow nodes_to_grow sockets_t
 IdleNode = namedtuple("IdleNode", "node_name idle_since")
 
 
-class AutoScaleRestClient(object):
+class HpcRestClient(object):
     def __init__(self, hostname="localhost"):
         self.hostname = hostname
         self.grow_decision_api_route = "https://{}/HpcManager/api/auto-scale/grow-decision"
@@ -40,7 +40,7 @@ class AutoScaleRestClient(object):
 
 
 if __name__ == '__main__':
-    client = AutoScaleRestClient()
+    client = HpcRestClient()
     ans = client.get_grow_decision()
     print ans.cores_to_grow
     print client.check_nodes_idle(json.dumps(['mesoswinagent', 'mesoswinagent2']))
