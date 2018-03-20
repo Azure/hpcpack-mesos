@@ -70,13 +70,12 @@ class HpcpackFramwork(object):
         self.mesos_client.on(MesosClient.OFFERS, self.offer_received)
         self.mesos_client.on(MesosClient.UPDATE, self.status_update)
         self.th = HpcpackFramwork.MesosFramework(self.mesos_client)
-        self.th.start()
-
         self.heartbeat_server = restserver.RestServer(self.heartbeat_table, 8088)
+
+    def start(self):
+        self.th.start()
         self.heartbeat_server.start()
-
         self.check_runaway_and_idle_slave()
-
         while True and self.th.isAlive():
             try:
                 self.th.join(1)
@@ -227,6 +226,8 @@ if __name__ == "__main__":  # TODO: handle various kinds of input params
     from sys import argv
     if len(argv) == 5:
         hpcpack_framework = HpcpackFramwork(argv[0], argv[1], argv[2], argv[3], argv[4])
+        hpcpack_framework.start()
     else:
         hpcpack_framework = HpcpackFramwork("Z:\\mesosframework\\setupscript.ps1", "C:\\HPCPack2016\\private.20180308.251b491.release.debug\\release.debug\\setup.exe",
                                             "mesoswinagent", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "172.16.1.5")
+        hpcpack_framework.start()
