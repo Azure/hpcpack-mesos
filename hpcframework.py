@@ -144,6 +144,9 @@ class HpcpackFramwork(object):
         self.logger.info("Offer %s meets HPC's requirement" % offer.get_offer()['id']['value'])
         self.run_job(offer)
 
+    def decline_offer(self, offer):
+        offer.decline()
+
     def get_scalar(self, collection, name):
         for i in collection:
             if i['name'] == name:
@@ -189,12 +192,12 @@ class HpcpackFramwork(object):
         mesos_offer.accept([task])
         self.heartbeat_table.add_slaveinfo(fqdn, agent_id, task_id, cpus)
 
-    def __kill_task(self, host):
+    def _kill_task(self, host):
         self.logger.debug("Killing task {} on host {}".format(host.task_id, host.fqdn))
         self.driver.kill(host.agent_id, host.task_id)
         self.heartbeat_table.on_slave_close(host.hostname)
 
-    def __kill_task_by_hostname(self, hostname):
+    def _kill_task_by_hostname(self, hostname):
         (task_id, agent_id) = self.heartbeat_table.get_task_info(hostname)
         if task_id != "":
             self.logger.debug("Killing task {} on host {}".format(task_id, hostname))
@@ -203,23 +206,24 @@ class HpcpackFramwork(object):
         else:
             self.logger.warn("Task info for host {} not found".format(hostname))
 
-    def check_runaway_and_idle_slave(self):
+    def check_runaway_and_idle_slave(self, start_timer=True):
         (provision_timeout_list, heartbeat_timeout_list, running_list) = self.heartbeat_table.check_timeout()
         self.logger.info("Get provision_timeout_list:{}".format(str(provision_timeout_list)))
         self.logger.info("Get heartbeat_timeout_list:{}".format(str(heartbeat_timeout_list)))
         timeout_lists = [provision_timeout_list, heartbeat_timeout_list]
         for host in itertools.chain(*timeout_lists):
-            self.__kill_task(host)
+            self._kill_task(host)
 
         running_host_names = [host.hostname for host in running_list]
         idle_nodes = self.hpc_client.check_nodes_idle(json.dumps(running_host_names))
         self.logger.info("Get idle_nodes:{}".format(str(idle_nodes)))
         for idle_node in idle_nodes:
-            self.__kill_task_by_hostname(idle_node.node_name)
+            self._kill_task_by_hostname(idle_node.node_name)
 
-        timer = threading.Timer(60.0, self.check_runaway_and_idle_slave)
-        timer.daemon = True
-        timer.start()
+        if start_timer:
+            timer = threading.Timer(60.0, self.check_runaway_and_idle_slave)
+            timer.daemon = True
+            timer.start()
 
 
 if __name__ == "__main__":  # TODO: handle various kinds of input params
