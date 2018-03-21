@@ -132,6 +132,12 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         heartbeat_table.on_slave_close(HOST1HOSTNAME)
         self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 0)
 
+    def test_check_fqdn_collision(self):
+        heartbeat_table = HeartBeatTable()
+        heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
+        self.assertTrue(heartbeat_table.check_fqdn_collision(HOST1FQDN2))
+        self.assertFalse(heartbeat_table.check_fqdn_collision(HOST1FQDN))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -15,9 +15,12 @@ class HeartBeatTable(object):
         self._provisioning_timeout = provisioning_timeout
         self._heartbeat_timeout = heartbeat_timeout
 
+    def __get_hostname_from_fqdn(self, fqdn):
+        return fqdn.split('.')[0]
+
     def add_slaveinfo(self, fqdn, agent_id, task_id, cpus, last_heartbeat=datetime.utcnow()):
         u_fqdn = fqdn.upper()
-        hostname = u_fqdn.split('.')[0]
+        hostname = self.__get_hostname_from_fqdn(u_fqdn)
         if hostname in self._table:
             if self._table[hostname].fqdn != u_fqdn:
                 self.logger.error("Duplicated hostname {} detected. Existing fqdn: {}, new fqdn {}. Ignore new heartbeat entry.".format(
@@ -77,6 +80,14 @@ class HeartBeatTable(object):
             except Exception as e:
                 self.logger.exception('Error in %s callback: %s' % (callback.__name__, str(e)))
 
+    def check_fqdn_collision(self, fqdn):
+        u_fqdn = fqdn.upper()
+        hostname = self.__get_hostname_from_fqdn(u_fqdn)
+        if hostname in self._table:
+            if self._table[hostname].fqdn != u_fqdn:
+                return True
+        return False
+
     def check_timeout(self, now=datetime.utcnow()):
         provision_timeout_list = []
         heartbeat_timeout_list = []
@@ -102,8 +113,7 @@ class HeartBeatTable(object):
         return cores
 
 
-SlaveInfo = namedtuple(
-    "SlaveInfo", "hostname fqdn agent_id task_id cpus last_heartbeat state")
+SlaveInfo = namedtuple("SlaveInfo", "hostname fqdn agent_id task_id cpus last_heartbeat state")
 
 
 class HpcState:

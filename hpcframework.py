@@ -113,28 +113,29 @@ class HpcpackFramwork(object):
             if grow_decision is None:
                 cores_to_grow = 0
             else:
-                cores_to_grow = grow_decision.cores_to_grow - self.heartbeat_table.get_cores_in_provisioning()
+                cores_in_provisioning = self.heartbeat_table.get_cores_in_provisioning()
+                cores_to_grow = grow_decision.cores_to_grow - cores_in_provisioning
 
             for offer in offers:  # type: Offer
+                take_offer = False
                 if cores_to_grow > 0:
-                    mesos_offer = offer.get_offer()
-                    self.logger.info("offer_received: {}".format((str(mesos_offer))))
-                    if 'attributes' in mesos_offer:
-                        attributes = mesos_offer['attributes']
-                        if self.get_text(attributes, 'os') != 'windows_server':
-                            self.decline_offer(offer)
-                        else:
+                    offer_dict = offer.get_offer()
+                    self.logger.info("cores_to_grow: {}, cores_in_provisioning: {}, offer_received: {}".format(
+                        cores_to_grow, cores_in_provisioning, (str(offer_dict))))
+                    if 'attributes' in offer_dict:
+                        attributes = offer_dict['attributes']
+                        if self.get_text(attributes, 'os') == 'windows_server':
                             cores = self.get_scalar(attributes, 'cores')
-                            cpus = self.get_scalar(mesos_offer['resources'], 'cpus')
+                            cpus = self.get_scalar(offer_dict['resources'], 'cpus')
                             if cores == cpus:
-                                cores_to_grow -= cpus
-                                self.accept_offer(offer)
-                            else:
-                                self.decline_offer(offer)
-                    else:
-                        self.decline_offer(offer)
+                                if not self.heartbeat_table.check_fqdn_collision(offer_dict['hostname']):
+                                    take_offer = True
+                if take_offer:
+                    cores_to_grow -= cpus
+                    self.accept_offer(offer)
                 else:
                     self.decline_offer(offer)
+
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception as ex:
@@ -160,12 +161,12 @@ class HpcpackFramwork(object):
         return ""
 
     def run_job(self, mesos_offer):
-        offer = mesos_offer.get_offer()
-        self.logger.info("Accepting offer: {}".format(str(offer)))
-        agent_id = offer['agent_id']['value']
-        fqdn = offer['hostname']
+        offer_dict = mesos_offer.get_offer()
+        self.logger.info("Accepting offer: {}".format(str(offer_dict)))
+        agent_id = offer_dict['agent_id']['value']
+        fqdn = offer_dict['hostname']
         task_id = uuid.uuid4().hex
-        cpus = self.get_scalar(offer['resources'], 'cpus')
+        cpus = self.get_scalar(offer_dict['resources'], 'cpus')
 
         task = {
             'name': 'hpc pack mesos cn',
@@ -181,7 +182,7 @@ class HpcpackFramwork(object):
                 {
                     'name': 'mem',
                     'type': 'SCALAR',
-                    'scalar': {'value': self.get_scalar(offer['resources'], 'mem')}
+                    'scalar': {'value': self.get_scalar(offer_dict['resources'], 'mem')}
                 }
             ],
             'command': {'value':
