@@ -115,26 +115,26 @@ class HpcpackFramwork(object):
             else:
                 cores_to_grow = grow_decision.cores_to_grow - self.heartbeat_table.get_cores_in_provisioning()
 
-            if cores_to_grow > 0:
-                for offer in offers:  # type: Offer
+            for offer in offers:  # type: Offer
+                if cores_to_grow > 0:
                     mesos_offer = offer.get_offer()
                     self.logger.info("offer_received: {}".format((str(mesos_offer))))
                     if 'attributes' in mesos_offer:
                         attributes = mesos_offer['attributes']
                         if self.get_text(attributes, 'os') != 'windows_server':
-                            offer.decline()
+                            self.decline_offer(offer)
                         else:
                             cores = self.get_scalar(attributes, 'cores')
                             cpus = self.get_scalar(mesos_offer['resources'], 'cpus')
                             if cores == cpus:
+                                cores_to_grow -= cpus
                                 self.accept_offer(offer)
                             else:
-                                offer.decline()
+                                self.decline_offer(offer)
                     else:
-                        offer.decline()
-            else:
-                for offer in offers:
-                    offer.decline()
+                        self.decline_offer(offer)
+                else:
+                    self.decline_offer(offer)
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception as ex:
