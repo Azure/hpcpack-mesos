@@ -7,7 +7,7 @@ import requests
 import logging_aux
 
 GrowDecision = namedtuple("GrowDecision", "cores_to_grow nodes_to_grow sockets_to_grow")
-IdleNode = namedtuple("IdleNode", "node_name idle_since")
+IdleNode = namedtuple("IdleNode", "node_name timestamp server_name")
 
 
 class HpcRestClient(object):
@@ -34,7 +34,7 @@ class HpcRestClient(object):
         if res.ok:
             self.logger.info("check_nodes_idle:" + res.content)
             jobjs = json.loads(res.content)
-            return [IdleNode(idle_info['NodeName'], idle_info['IdleSince']) for idle_info in jobjs]
+            return [IdleNode(idle_info['NodeName'], idle_info['TimeStamp'], idle_info['ServerName']) for idle_info in jobjs]
         else:
             self.logger.error("status_code:{} content:{}".format(res.status_code, res.content))
 
