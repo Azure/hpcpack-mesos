@@ -14,6 +14,11 @@ if (!$CreatedMutex) {
 
 Write-Output "Mutex entered"
 
+# Clean up any left over scheduled tasks
+schtasks /delete /tn mesoshpcdaemon /f
+schtasks /delete /tn mesoshpconline /f
+
+
 $s = "powershell -WindowStyle Hidden -file " + (Split-Path -parent $myinvocation.mycommand.path) + "\daemon.ps1 > C:\deamon.log"
 $s
 schtasks /create /tn mesoshpcdaemon /tr $s /sc onstart /f
