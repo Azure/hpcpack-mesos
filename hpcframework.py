@@ -241,7 +241,7 @@ class HpcpackFramwork(object):
             else:
                 new_node_idle_check_table[node_name] = 1
         self.node_idle_check_table = new_node_idle_check_table
-        return [name for name, value in self.node_idle_check_table if value > max_tolerance]
+        return [name for name, value in self.node_idle_check_table.iteritems() if value > max_tolerance]
 
 
 if __name__ == "__main__":  # TODO: handle various kinds of input params
@@ -250,6 +250,6 @@ if __name__ == "__main__":  # TODO: handle various kinds of input params
         hpcpack_framework = HpcpackFramwork(argv[0], argv[1], argv[2], argv[3], argv[4])
         hpcpack_framework.start()
     else:
-        hpcpack_framework = HpcpackFramwork("Z:\\mesosframework\\setupscript.ps1", "C:\\HPCPack2016\\private.20180308.251b491.release.debug\\release.debug\\setup.exe",
+        hpcpack_framework = HpcpackFramwork("C:\\mesosframework\\setupscript.ps1", "C:\\HPCPack2016\\private.20180308.251b491.release.debug\\release.debug\\setup.exe",
                                             "mesoswinagent", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "172.16.1.5")
         hpcpack_framework.start()
