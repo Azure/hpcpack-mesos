@@ -21,6 +21,9 @@ import restclient
 import restserver
 from restclient import HpcRestClient
 
+CHECK_IDLE_INTERVAL = 60.0
+NODE_IDLE_TIMEOUT = 180.0
+
 
 class HpcpackFramwork(object):
     class MesosFramework(threading.Thread):
@@ -40,6 +43,7 @@ class HpcpackFramwork(object):
         self.logger = logging_aux.init_logger_aux("hpcframework", "hpcframework.log")
         # signal.signal(signal.SIGINT, signal.SIG_IGN)
         logging.getLogger('mesoshttp').setLevel(logging.DEBUG)
+        self.node_idle_check_table = {}
         self.script_path = script_path
         self.setup_path = setup_path
         self.headnode = headnode
@@ -65,7 +69,7 @@ class HpcpackFramwork(object):
 
         self.driver = None  # type: MesosClient.SchedulerDriver
         self.mesos_client = MesosClient(mesos_urls=['http://172.16.1.4:5050'])
-        # self.client = MesosClient(mesos_urls=['zk://127.0.0.1:2181/mesos'])
+        # self.mesos_client = MesosClient(mesos_urls=['zk://127.0.0.1:2181/mesos'])
         self.mesos_client.on(MesosClient.SUBSCRIBED, self.subscribed)
         self.mesos_client.on(MesosClient.OFFERS, self.offer_received)
         self.mesos_client.on(MesosClient.UPDATE, self.status_update)
@@ -218,13 +222,26 @@ class HpcpackFramwork(object):
         running_host_names = [host.hostname for host in running_list]
         idle_nodes = self.hpc_client.check_nodes_idle(json.dumps(running_host_names))
         self.logger.info("Get idle_nodes:{}".format(str(idle_nodes)))
-        for idle_node in idle_nodes:
-            self._kill_task_by_hostname(idle_node.node_name)
+        idle_timeout_nodes = self._check_node_idle_timeout([node.node_name for node in idle_nodes])
+        self.logger.info("Get idle_timeout_nodes:{}".format(str(idle_timeout_nodes)))
+        for idle_timeout_node in idle_timeout_nodes:
+            self._kill_task_by_hostname(idle_timeout_node)
 
         if start_timer:
-            timer = threading.Timer(60.0, self.check_runaway_and_idle_slave)
+            timer = threading.Timer(CHECK_IDLE_INTERVAL, self.check_runaway_and_idle_slave)
             timer.daemon = True
             timer.start()
+
+    def _check_node_idle_timeout(self, node_names):
+        new_node_idle_check_table = {}
+        max_tolerance = NODE_IDLE_TIMEOUT / CHECK_IDLE_INTERVAL
+        for node_name in node_names:
+            if node_name in self.node_idle_check_table:
+                new_node_idle_check_table[node_name] = self.node_idle_check_table[node_name] + 1
+            else:
+                new_node_idle_check_table[node_name] = 1
+        self.node_idle_check_table = new_node_idle_check_table
+        return [name for name, value in self.node_idle_check_table if value > max_tolerance]
 
 
 if __name__ == "__main__":  # TODO: handle various kinds of input params
