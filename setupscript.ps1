@@ -19,7 +19,7 @@ schtasks /delete /tn mesoshpcdaemon /f
 schtasks /delete /tn mesoshpconline /f
 
 
-$s = "powershell -WindowStyle Hidden -file " + (Split-Path -parent $myinvocation.mycommand.path) + "\daemon.ps1 > C:\deamon.log"
+$s = "cmd /c powershell -WindowStyle Hidden -file " + (Split-Path -parent $myinvocation.mycommand.path) + "\daemon.ps1 > %temp%\hpcmesos_deamon.log"
 $s
 schtasks /create /tn mesoshpcdaemon /tr $s /sc onstart /f
 schtasks /run /tn mesoshpcdaemon
@@ -79,7 +79,7 @@ $bringOnlineProc = Start-Process "Powershell.exe" -ArgumentList ('-noexit -encod
 $bringOnlineProc.WaitForExit()
 #>
 
-$s = "powershell -file " + (Split-Path -parent $myinvocation.mycommand.path) + "\bringOnline.ps1"
+$s = "cmd /c powershell -file " + (Split-Path -parent $myinvocation.mycommand.path) + "\bringOnline.ps1 > %temp%\hpcmesos_bringonline.log"
 #$s = "powershell -noexit -file c:\hpcpack2016\bringOnline.ps1"
 $s
 schtasks /create /tn mesoshpconline /tr $s /sc onstart /f
