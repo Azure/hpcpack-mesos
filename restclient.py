@@ -17,9 +17,10 @@ class HpcRestClient(object):
     GROW_DECISION_API_ROUTE = "https://{}/HpcManager/api/auto-scale/grow-decision"
     CHECK_NODES_IDLE_ROUTE = "https://{}/HpcManager/api/auto-scale/check-nodes-idle"
     # node management api set
-    BRING_NODE_ONLINE_ROUTE = "https://{}/HpcManager/api/nodes/bringOnline"
-    TAKE_NODE_OFFLINE_ROUTE = "https://{}/HpcManager/api/nodes/takeOffline"
-    ASSIGN_NODE_TEMPLATE_ROUTE = "https://{}/HpcManager/api/nodes/assignTemplate"
+    BRING_NODES_ONLINE_ROUTE = "https://{}/HpcManager/api/nodes/bringOnline"
+    TAKE_NODES_OFFLINE_ROUTE = "https://{}/HpcManager/api/nodes/takeOffline"
+    ASSIGN_NODES_TEMPLATE_ROUTE = "https://{}/HpcManager/api/nodes/assignTemplate"
+    REMOVE_NODES_ROUTE = "https://{}/HpcManager/api/nodes/remove"
 
     def __init__(self, hostname="localhost"):
         self.hostname = hostname
@@ -60,21 +61,27 @@ class HpcRestClient(object):
             return [IdleNode(idle_info['NodeName'], idle_info['TimeStamp'], idle_info['ServerName']) for idle_info in jobjs]
 
     # Starts node management api
-    def bring_node_online(self, nodes):
-        success, res = self._post(self.bring_node_online.__name__, self.BRING_NODE_ONLINE_ROUTE, nodes)
+    def bring_nodes_online(self, nodes):
+        success, res = self._post(self.bring_nodes_online.__name__, self.BRING_NODES_ONLINE_ROUTE, nodes)
         if success:
             jobj = json.loads(res.content)
             return jobj
 
-    def take_node_offline(self, nodes):
-        success, res = self._post(self.take_node_offline.__name__, self.TAKE_NODE_OFFLINE_ROUTE, nodes)
+    def take_nodes_offline(self, nodes):
+        success, res = self._post(self.take_nodes_offline.__name__, self.TAKE_NODES_OFFLINE_ROUTE, nodes)
         if success:
             jobj = json.loads(res.content)
             return jobj
 
-    def assign_node_template(self, nodename_arr, template_name):
+    def assign_nodes_template(self, nodename_arr, template_name):
         params = json.dumps({"nodeNames": nodename_arr, "templateName": template_name})
-        success, res = self._post(self.assign_node_template.__name__, self.ASSIGN_NODE_TEMPLATE_ROUTE, params)
+        success, res = self._post(self.assign_nodes_template.__name__, self.ASSIGN_NODES_TEMPLATE_ROUTE, params)
+        if success:
+            jobj = json.loads(res.content)
+            return jobj
+
+    def remove_nodes(self, nodes):        
+        success, res = self._post(self.remove_nodes.__name__, self.REMOVE_NODES_ROUTE, nodes)
         if success:
             jobj = json.loads(res.content)
             return jobj
@@ -86,5 +93,5 @@ if __name__ == '__main__':
     print ans.cores_to_grow
     print client.check_nodes_idle(json.dumps(['mesoswinjd']))
 
-    print client.bring_node_online(json.dumps(['mesoswinjd']))
-    print client.assign_node_template(['iaascn000'], client.DEFAULT_COMPUTENODE_TEMPLATE)
+    # print client.bring_nodes_online(json.dumps(['mesoswinjd']))
+    # print client.assign_nodes_template(['iaascn000'], client.DEFAULT_COMPUTENODE_TEMPLATE)
