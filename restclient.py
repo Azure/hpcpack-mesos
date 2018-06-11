@@ -21,6 +21,11 @@ class HpcRestClient(object):
     TAKE_NODES_OFFLINE_ROUTE = "https://{}/HpcManager/api/nodes/takeOffline"
     ASSIGN_NODES_TEMPLATE_ROUTE = "https://{}/HpcManager/api/nodes/assignTemplate"
     REMOVE_NODES_ROUTE = "https://{}/HpcManager/api/nodes/remove"
+    # node group api set
+    NODE_GROUPS_ROOT_ROUTE = "https://{}/HpcManager/api/node-groups"
+    LIST_NODE_GROUPS_ROUTE = NODE_GROUPS_ROOT_ROUTE
+    ADD_NEW_GROUP_ROUTE = NODE_GROUPS_ROOT_ROUTE
+    ADD_NODES_TO_NODE_GROUP_ROUTE = NODE_GROUPS_ROOT_ROUTE.format("{{}}") + "/{group_name}"
 
     def __init__(self, hostname="localhost"):
         self.hostname = hostname
@@ -31,6 +36,18 @@ class HpcRestClient(object):
 
     def _log_info(self, function_name, res):
         self.logger.info(function_name + ":" + res.content)
+
+    # todo: consolidate these ceremonies.
+    def _get(self, function_name, function_route, params):
+        headers = {"Content-Type": "application/json"}
+        url = function_route.format(self.hostname)
+        res = requests.get(url, headers=headers, verify=False, params = params)
+        if res.ok:
+            self._log_info(function_name, res)
+            return True, res
+        else:
+            self._log_error(function_name, res)
+            return False, None
 
     def _post(self, function_name, function_route, data):
         headers = {"Content-Type": "application/json"}
@@ -80,12 +97,34 @@ class HpcRestClient(object):
             jobj = json.loads(res.content)
             return jobj
 
-    def remove_nodes(self, nodes):        
+    def remove_nodes(self, nodes):
         success, res = self._post(self.remove_nodes.__name__, self.REMOVE_NODES_ROUTE, nodes)
         if success:
             jobj = json.loads(res.content)
             return jobj
 
+    # Starts node group api
+    def list_node_groups(self, group_name = ""):
+        params = {}
+        if group_name != "":
+            params['nodeGroupName'] = group_name
+        success, res = self._get(self.list_node_groups.__name__, self.LIST_NODE_GROUPS_ROUTE, group_name)
+        if success:
+            jobj = json.loads(res.content)
+            return jobj
+
+    def add_node_group(self, group_name, group_description=""):
+        params = json.dumps({"name": group_name, "description": group_description})
+        success, res = self._post(self.add_node_group.__name__, self.ADD_NEW_GROUP_ROUTE, params)
+        if success:
+            jobj = json.loads(res.content)
+            return jobj
+
+    def add_node_to_node_group(self, group_name, node_names):
+        success, res = self._post(self.add_node_to_node_group.__name__, self.ADD_NODES_TO_NODE_GROUP_ROUTE.format(group_name = group_name), node_names)
+        if success:
+            jobj= json.loads(res.content)
+            return jobj
 
 if __name__ == '__main__':
     client = HpcRestClient()
@@ -93,5 +132,8 @@ if __name__ == '__main__':
     print ans.cores_to_grow
     print client.check_nodes_idle(json.dumps(['mesoswinjd']))
 
+    print client.list_node_groups()
+    print client.add_node_group("mesos")
+    print client.add_node_to_node_group("mesos", json.dumps(["mesoswinjd"]))
     # print client.bring_nodes_online(json.dumps(['mesoswinjd']))
     # print client.assign_nodes_template(['iaascn000'], client.DEFAULT_COMPUTENODE_TEMPLATE)
