@@ -3,6 +3,7 @@ import logging
 from collections import namedtuple
 
 import requests
+from requests.exceptions import HTTPError
 
 import logging_aux
 
@@ -41,24 +42,26 @@ class HpcRestClient(object):
     def _get(self, function_name, function_route, params):
         headers = {"Content-Type": "application/json"}
         url = function_route.format(self.hostname)
-        res = requests.get(url, headers=headers, verify=False, params = params)
-        if res.ok:
+        res = requests.get(url, headers=headers, verify=False, params = params)        
+        try:
+            res.raise_for_status()
             self._log_info(function_name, res)
-            return True, res
-        else:
+            return res
+        except HTTPError:       
             self._log_error(function_name, res)
-            return False, None
+            raise
 
     def _post(self, function_name, function_route, data):
         headers = {"Content-Type": "application/json"}
         url = function_route.format(self.hostname)
         res = requests.post(url, data=data, headers=headers, verify=False)
-        if res.ok:
+        try:
+            res.raise_for_status()
             self._log_info(function_name, res)
-            return True, res
-        else:
+            return res
+        except HTTPError:       
             self._log_error(function_name, res)
-            return False, None
+            raise
 
     # Starts auto-scale api
     def get_grow_decision(self):
@@ -72,59 +75,48 @@ class HpcRestClient(object):
             self.logger.error("status_code:{} content:{}".format(res.status_code, res.content))
 
     def check_nodes_idle(self, nodes):
-        success, res = self._post(self.check_nodes_idle.__name__, self.CHECK_NODES_IDLE_ROUTE, nodes)
-        if success:
-            jobjs = json.loads(res.content)
-            return [IdleNode(idle_info['NodeName'], idle_info['TimeStamp'], idle_info['ServerName']) for idle_info in jobjs]
+        res = self._post(self.check_nodes_idle.__name__, self.CHECK_NODES_IDLE_ROUTE, nodes)        
+        jobjs = json.loads(res.content)
+        return [IdleNode(idle_info['NodeName'], idle_info['TimeStamp'], idle_info['ServerName']) for idle_info in jobjs]
 
     # Starts node management api
     def bring_nodes_online(self, nodes):
-        success, res = self._post(self.bring_nodes_online.__name__, self.BRING_NODES_ONLINE_ROUTE, nodes)
-        if success:
-            jobj = json.loads(res.content)
-            return jobj
+        res = self._post(self.bring_nodes_online.__name__, self.BRING_NODES_ONLINE_ROUTE, nodes)        
+        return self._return_json_from_res(res)
 
     def take_nodes_offline(self, nodes):
-        success, res = self._post(self.take_nodes_offline.__name__, self.TAKE_NODES_OFFLINE_ROUTE, nodes)
-        if success:
-            jobj = json.loads(res.content)
-            return jobj
+        res = self._post(self.take_nodes_offline.__name__, self.TAKE_NODES_OFFLINE_ROUTE, nodes)        
+        return self._return_json_from_res(res)
 
     def assign_nodes_template(self, nodename_arr, template_name):
         params = json.dumps({"nodeNames": nodename_arr, "templateName": template_name})
-        success, res = self._post(self.assign_nodes_template.__name__, self.ASSIGN_NODES_TEMPLATE_ROUTE, params)
-        if success:
-            jobj = json.loads(res.content)
-            return jobj
+        res = self._post(self.assign_nodes_template.__name__, self.ASSIGN_NODES_TEMPLATE_ROUTE, params)
+        return self._return_json_from_res(res)
 
     def remove_nodes(self, nodes):
-        success, res = self._post(self.remove_nodes.__name__, self.REMOVE_NODES_ROUTE, nodes)
-        if success:
-            jobj = json.loads(res.content)
-            return jobj
+        res = self._post(self.remove_nodes.__name__, self.REMOVE_NODES_ROUTE, nodes)
+        return self._return_json_from_res(res)
 
     # Starts node group api
     def list_node_groups(self, group_name = ""):
         params = {}
         if group_name != "":
             params['nodeGroupName'] = group_name
-        success, res = self._get(self.list_node_groups.__name__, self.LIST_NODE_GROUPS_ROUTE, group_name)
-        if success:
-            jobj = json.loads(res.content)
-            return jobj
+        res = self._get(self.list_node_groups.__name__, self.LIST_NODE_GROUPS_ROUTE, group_name)        
+        return self._return_json_from_res(res)
 
     def add_node_group(self, group_name, group_description=""):
         params = json.dumps({"name": group_name, "description": group_description})
-        success, res = self._post(self.add_node_group.__name__, self.ADD_NEW_GROUP_ROUTE, params)
-        if success:
-            jobj = json.loads(res.content)
-            return jobj
+        res = self._post(self.add_node_group.__name__, self.ADD_NEW_GROUP_ROUTE, params)
+        return self._return_json_from_res(res)
 
     def add_node_to_node_group(self, group_name, node_names):
-        success, res = self._post(self.add_node_to_node_group.__name__, self.ADD_NODES_TO_NODE_GROUP_ROUTE.format(group_name = group_name), node_names)
-        if success:
-            jobj= json.loads(res.content)
-            return jobj
+        res = self._post(self.add_node_to_node_group.__name__, self.ADD_NODES_TO_NODE_GROUP_ROUTE.format(group_name = group_name), node_names)
+        return self._return_json_from_res(res)
+
+    def _return_json_from_res(self, res):
+        jobj = json.loads(res.content)
+        return jobj    
 
 if __name__ == '__main__':
     client = HpcRestClient()
@@ -133,7 +125,7 @@ if __name__ == '__main__':
     print client.check_nodes_idle(json.dumps(['mesoswinjd']))
 
     print client.list_node_groups()
-    print client.add_node_group("mesos")
+    print client.add_node_group("Mesos", "Node Group for Compute nodes from Mesos")
     print client.add_node_to_node_group("mesos", json.dumps(["mesoswinjd"]))
     # print client.bring_nodes_online(json.dumps(['mesoswinjd']))
     # print client.assign_nodes_template(['iaascn000'], client.DEFAULT_COMPUTENODE_TEMPLATE)
