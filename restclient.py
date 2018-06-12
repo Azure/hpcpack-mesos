@@ -102,7 +102,7 @@ class HpcRestClient(object):
         params = {}
         if group_name != "":
             params['nodeGroupName'] = group_name
-        res = self._get(self.list_node_groups.__name__, self.LIST_NODE_GROUPS_ROUTE, group_name)        
+        res = self._get(self.list_node_groups.__name__, self.LIST_NODE_GROUPS_ROUTE, params)        
         return self._return_json_from_res(res)
 
     def add_node_group(self, group_name, group_description=""):
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     print ans.cores_to_grow
     print client.check_nodes_idle(json.dumps(['mesoswinjd']))
 
-    print client.list_node_groups()
+    print client.list_node_groups("MESOS")
     print client.add_node_group("Mesos", "Node Group for Compute nodes from Mesos")
     print client.add_node_to_node_group("mesos", json.dumps(["mesoswinjd"]))
     # print client.bring_nodes_online(json.dumps(['mesoswinjd']))
