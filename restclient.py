@@ -10,6 +10,7 @@ import logging_aux
 GrowDecision = namedtuple("GrowDecision", "cores_to_grow nodes_to_grow sockets_to_grow")
 IdleNode = namedtuple("IdleNode", "node_name timestamp server_name")
 
+# TODO: change all method inputs to either all in json format or not
 
 class HpcRestClient(object):
     DEFAULT_NODEGROUP_TOKEN = "default"
@@ -22,6 +23,7 @@ class HpcRestClient(object):
     TAKE_NODES_OFFLINE_ROUTE = "https://{}/HpcManager/api/nodes/takeOffline"
     ASSIGN_NODES_TEMPLATE_ROUTE = "https://{}/HpcManager/api/nodes/assignTemplate"
     REMOVE_NODES_ROUTE = "https://{}/HpcManager/api/nodes/remove"
+    NODE_STATUS_EXACT_ROUTE = "https://{}/HpcManager/api/nodes/status/getExact"
     # node group api set
     NODE_GROUPS_ROOT_ROUTE = "https://{}/HpcManager/api/node-groups"
     LIST_NODE_GROUPS_ROUTE = NODE_GROUPS_ROOT_ROUTE
@@ -81,12 +83,17 @@ class HpcRestClient(object):
 
     # Starts node management api
     def bring_nodes_online(self, nodes):
-        res = self._post(self.bring_nodes_online.__name__, self.BRING_NODES_ONLINE_ROUTE, nodes)        
+        data = json.dumps(nodes)
+        res = self._post(self.bring_nodes_online.__name__, self.BRING_NODES_ONLINE_ROUTE, data)        
         return self._return_json_from_res(res)
 
     def take_nodes_offline(self, nodes):
-        res = self._post(self.take_nodes_offline.__name__, self.TAKE_NODES_OFFLINE_ROUTE, nodes)        
+        data = json.dumps(nodes)
+        res = self._post(self.take_nodes_offline.__name__, self.TAKE_NODES_OFFLINE_ROUTE, data)        
         return self._return_json_from_res(res)
+
+    def assign_default_compute_node_template(self, nodename_arr):
+        return self.assign_nodes_template(nodename_arr, self.DEFAULT_COMPUTENODE_TEMPLATE)
 
     def assign_nodes_template(self, nodename_arr, template_name):
         params = json.dumps({"nodeNames": nodename_arr, "templateName": template_name})
@@ -95,6 +102,11 @@ class HpcRestClient(object):
 
     def remove_nodes(self, nodes):
         res = self._post(self.remove_nodes.__name__, self.REMOVE_NODES_ROUTE, nodes)
+        return self._return_json_from_res(res)
+
+    def get_node_status_exact(self, node_names):
+        params = json.dumps({"nodeNames": node_names})
+        res = self._post(self.get_node_status_exact.__name__, self.NODE_STATUS_EXACT_ROUTE, params)
         return self._return_json_from_res(res)
 
     # Starts node group api
@@ -111,7 +123,7 @@ class HpcRestClient(object):
         return self._return_json_from_res(res)
 
     def add_node_to_node_group(self, group_name, node_names):
-        res = self._post(self.add_node_to_node_group.__name__, self.ADD_NODES_TO_NODE_GROUP_ROUTE.format(group_name = group_name), node_names)
+        res = self._post(self.add_node_to_node_group.__name__, self.ADD_NODES_TO_NODE_GROUP_ROUTE.format(group_name = group_name), json.dumps(node_names))
         return self._return_json_from_res(res)
 
     def _return_json_from_res(self, res):
@@ -126,6 +138,8 @@ if __name__ == '__main__':
 
     print client.list_node_groups("MESOS")
     print client.add_node_group("Mesos", "Node Group for Compute nodes from Mesos")
-    print client.add_node_to_node_group("mesos", json.dumps(["mesoswinjd"]))
-    # print client.bring_nodes_online(json.dumps(['mesoswinjd']))
+    print client.add_node_to_node_group("mesos", ["mesoswinjd"])
+    # print client.bring_nodes_online(['mesoswinjd'])
     # print client.assign_nodes_template(['iaascn000'], client.DEFAULT_COMPUTENODE_TEMPLATE)
+
+    print client.get_node_status_exact(["mesoswinjd"])
