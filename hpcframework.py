@@ -23,6 +23,8 @@ from restclient import HpcRestClient
 
 CHECK_IDLE_INTERVAL = 60.0
 NODE_IDLE_TIMEOUT = 180.0
+MESOS_NODE_GROUP_NAME = "Mesos"
+MESOS_NODE_GROUP_DESCRIPTION = "The Mesos compute nodes in the cluster"
 
 
 class HpcpackFramwork(object):
@@ -242,6 +244,64 @@ class HpcpackFramwork(object):
                 new_node_idle_check_table[node_name] = 1
         self.node_idle_check_table = new_node_idle_check_table
         return [name for name, value in self.node_idle_check_table.iteritems() if value > max_tolerance]
+
+    def configure_compute_nodes_callback(self, configuring_node_names):
+        if not configuring_node_names:
+            return []
+
+        groups = self.hpc_client.list_node_groups(MESOS_NODE_GROUP_NAME)
+        if MESOS_NODE_GROUP_NAME not in groups:
+            self.hpc_client.add_node_group(MESOS_NODE_GROUP_NAME, MESOS_NODE_GROUP_DESCRIPTION)
+
+        node_status_list = self.hpc_client.get_node_status_exact(configuring_node_names)
+        self.logger.info("Get node_status_list:{}".format(str(node_status_list)))
+        unapproved_node_list = []
+        take_offline_node_list = []
+        bring_online_node_list = []
+        change_node_group_node_list = []
+        configured_node_names = []
+        invalid_state_node_dict = {}
+        for node_status in node_status_list:
+            node_name = node_status["Name"]
+            node_state = node_status["NodeState"]
+            if node_status["NodeHealth"] == "Unapproved":
+                unapproved_node_list.append(node_name)
+            # node approved
+            elif MESOS_NODE_GROUP_NAME not in node_status["Groups"]:                
+                if node_state == "Online":
+                    take_offline_node_list.append(node_name)                
+                elif node_state == "Offline":
+                    change_node_group_node_list.append(node_name)
+                else:
+                    invalid_state_node_dict[node_name] = node_state
+            # node group properly set
+            elif node_state == "Offline":
+                bring_online_node_list.append(node_name)   
+            elif node_state == "Online":
+                # this node is all set
+                configured_node_names.append(node_name)
+            else:
+                invalid_state_node_dict[node_name] = node_state
+        try:
+            if invalid_state_node_dict:
+                self.logger.info("Node(s) in invalid state: {}".format(str(invalid_state_node_dict)))   
+            if unapproved_node_list:
+                self.logger.info("Assigning node template for node(s): {}".format(str(unapproved_node_list)))   
+                self.hpc_client.assign_default_compute_node_template(unapproved_node_list)
+            if take_offline_node_list:
+                self.logger.info("Taking node(s) offline: {}".format(str(take_offline_node_list)))   
+                self.hpc_client.take_nodes_offline(take_offline_node_list)
+            if bring_online_node_list:
+                self.logger.info("Bringing node(s) online: {}".format(str(bring_online_node_list)))   
+                self.hpc_client.bring_nodes_online(bring_online_node_list)
+            if change_node_group_node_list:
+                self.logger.info("Changing node group node(s): {}".format(str(change_node_group_node_list)))   
+                self.hpc_client.add_node_to_node_group(MESOS_NODE_GROUP_NAME, change_node_group_node_list)
+        except:
+            # Swallow all exceptions here. As we don't want any exception to prevent configured nodes to work
+            self.logger.exception('')                        
+        
+        return configured_node_names
 
 
 if __name__ == "__main__":  # TODO: handle various kinds of input params
