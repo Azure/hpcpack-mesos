@@ -7,16 +7,21 @@ import logging_aux
 
 class HeartBeatTable(object):
 
+    CHECK_CONFIGURING_NODES_INTERVAL = 5 # in seconds
+
     def __init__(self, provisioning_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=3)):
         self._table = {}
         self.logger = logging_aux.init_logger_aux("hpcframework.heartbeat", "hpcframework.heartbeat.log")
-        self.on_host_running = []
+        self.on_node_configuring = []
         self._table_lock = threading.Lock()
         self._provisioning_timeout = provisioning_timeout
         self._heartbeat_timeout = heartbeat_timeout
 
     def __get_hostname_from_fqdn(self, fqdn):
         return fqdn.split('.')[0]
+
+    def subscribe_node_configuring(self, callback):
+        self.on_node_configuring.append(callback)
 
     def add_slaveinfo(self, fqdn, agent_id, task_id, cpus, last_heartbeat=datetime.utcnow()):
         u_fqdn = fqdn.upper()
@@ -38,13 +43,13 @@ class HeartBeatTable(object):
             self._table[u_hostname] = self._table[u_hostname]._replace(last_heartbeat=now)
             self.logger.info("Heatbeat from host {}".format(u_hostname))
             if self._table[u_hostname].state == HpcState.Provisioning:
-                with self._table_lock:  # to ensure we only run running callback once per entry
+                with self._table_lock:
                     if self._table[u_hostname].state == HpcState.Provisioning:
-                        self._table[u_hostname] = self._table[u_hostname]._replace(state=HpcState.Running)
-                        self.__exec_callback(self.on_host_running)
-                        self.logger.info("Host {} start running".format(u_hostname))
+                        self._table[u_hostname] = self._table[u_hostname]._replace(state=HpcState.Configuring)
+                        self.logger.info("Configuring Host {}".format(u_hostname))
         else:
             self.logger.error("Host {} is not recognized. Heartbeat ignored.".format(u_hostname))
+            self.logger.error("_table {} ".format(self._table))
 
     def on_slave_close(self, hostname):
         u_hostname = hostname.upper()
@@ -103,7 +108,7 @@ class HeartBeatTable(object):
                 else:
                     running_list.append(host)
         return (provision_timeout_list, heartbeat_timeout_list, running_list)
-
+    
     def get_cores_in_provisioning(self):
         cores = 0.0
         for host in dict(self._table).itervalues():
@@ -112,9 +117,36 @@ class HeartBeatTable(object):
         self.logger.info("Cores in provisioning: {}".format(cores))
         return cores
 
+    def _configure_compute_nodes(self):
+        configuring_node_names = []
+        configured_node_names = []
+        for host in dict(self._table).itervalues():
+            if host.state == HpcState.Configuring:
+                configuring_node_names.append(host.hostname)
+                self.logger.info("Nodes in configuring: {}".format(configuring_node_names))        
+        
+        if configuring_node_names:
+            for callback in self.on_node_configuring:
+                configured_node_names = callback(configuring_node_names)
+                self.logger.info("Nodes configured: {}".format(configured_node_names))    
+
+        if configured_node_names:
+            for node_name in configured_node_names:
+                self._table[node_name.upper()]._replace(state=HpcState.Running)
+
+    def start_configure_compute_nodes_timer(self):
+        self._configure_compute_nodes()
+        timer = threading.Timer(self.CHECK_CONFIGURING_NODES_INTERVAL, self.start_configure_compute_nodes_timer)
+        timer.daemon = True
+        timer.start()
+
+    def start(self):
+        self.start_configure_compute_nodes_timer()
+
+
 
 SlaveInfo = namedtuple("SlaveInfo", "hostname fqdn agent_id task_id cpus last_heartbeat state")
 
 
 class HpcState:
-    Unknown, Provisioning, Running, Closed = range(4)
+    Unknown, Provisioning, Configuring, Running, Closing, Closed = range(6)

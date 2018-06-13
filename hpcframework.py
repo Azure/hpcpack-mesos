@@ -51,10 +51,10 @@ class HpcpackFramwork(object):
         self.headnode = headnode
         self.ssl_thumbprint = ssl_thumbprint
         self.framework_uri = framework_uri
-
         self.heartbeat_table = heartbeat_table.HeartBeatTable()
-
         self.hpc_client = HpcRestClient()
+        self.heartbeat_table.subscribe_node_configuring(self.configure_compute_nodes_callback)
+        self.heartbeat_table.start()
         self.core_provisioning = 0.0
 
         '''
@@ -310,6 +310,8 @@ if __name__ == "__main__":  # TODO: handle various kinds of input params
         hpcpack_framework = HpcpackFramwork(argv[0], argv[1], argv[2], argv[3], argv[4])
         hpcpack_framework.start()
     else:
-        hpcpack_framework = HpcpackFramwork("C:\\mesosframework\\setupscript.ps1", "C:\\HPCPack2016\\private.20180308.251b491.release.debug\\release.debug\\setup.exe",
-                                            "mesoswinagent", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "172.16.1.5")
+        hpcpack_framework = HpcpackFramwork("E:\\hpcsetup\\setupscript.ps1", "E:\\hpcsetup\\private.20180524.5b26f44.release.debug\\release.debug\\setup.exe",
+                                            "mesoswinjd", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "mesoswinjd")
+        
         hpcpack_framework.start()
+
