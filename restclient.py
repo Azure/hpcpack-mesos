@@ -30,6 +30,16 @@ class HpcRestClient(object):
     ADD_NEW_GROUP_ROUTE = NODE_GROUPS_ROOT_ROUTE
     ADD_NODES_TO_NODE_GROUP_ROUTE = NODE_GROUPS_ROOT_ROUTE.format("{{}}") + "/{group_name}"
 
+    # constants in result
+    NODE_STATUS_NODE_NAME_KEY = "Name"
+    NODE_STATUS_NODE_STATE_KEY = "NodeState"
+    NODE_STATUS_NODE_STATE_ONLINE_VALUE = "Online"
+    NODE_STATUS_NODE_STATE_OFFLINE_VALUE = "Offline"
+
+    NODE_STATUS_NODE_HEALTH_KEY = "NodeHealth"
+    NODE_STATUS_NODE_HEALTH_UNAPPROVED_VALUE = "Unapproved"
+    NODE_STATUS_NODE_GROUP_KEY = "Groups"
+
     def __init__(self, hostname="localhost"):
         self.hostname = hostname
         self.logger = logging_aux.init_logger_aux("hpcframework.restclient", 'hpcframework.restclient.log')
@@ -40,7 +50,7 @@ class HpcRestClient(object):
     def _log_info(self, function_name, res):
         self.logger.info(function_name + ":" + res.content)
 
-    # todo: consolidate these ceremonies.
+    # TODO: consolidate these ceremonies.
     def _get(self, function_name, function_route, params):
         headers = {"Content-Type": "application/json"}
         url = function_route.format(self.hostname)
@@ -77,7 +87,8 @@ class HpcRestClient(object):
             self.logger.error("status_code:{} content:{}".format(res.status_code, res.content))
 
     def check_nodes_idle(self, nodes):
-        res = self._post(self.check_nodes_idle.__name__, self.CHECK_NODES_IDLE_ROUTE, nodes)        
+        data = json.dumps(nodes)
+        res = self._post(self.check_nodes_idle.__name__, self.CHECK_NODES_IDLE_ROUTE, data)        
         jobjs = json.loads(res.content)
         return [IdleNode(idle_info['NodeName'], idle_info['TimeStamp'], idle_info['ServerName']) for idle_info in jobjs]
 
@@ -101,7 +112,8 @@ class HpcRestClient(object):
         return self._return_json_from_res(res)
 
     def remove_nodes(self, nodes):
-        res = self._post(self.remove_nodes.__name__, self.REMOVE_NODES_ROUTE, nodes)
+        data = json.dumps(nodes)
+        res = self._post(self.remove_nodes.__name__, self.REMOVE_NODES_ROUTE, data)
         return self._return_json_from_res(res)
 
     def get_node_status_exact(self, node_names):

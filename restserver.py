@@ -4,7 +4,7 @@ import threading
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 import logging_aux
-from heartbeat_table import HeartBeatTable
+from heartbeat_table import HpcClusterManager
 
 
 class HeartBeatServer(object):  # TODO: replace this implementation with twisted based implementation

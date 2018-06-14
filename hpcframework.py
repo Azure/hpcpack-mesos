@@ -1,6 +1,5 @@
 import base64
 import codecs
-import itertools
 import json
 import logging
 import os
@@ -20,11 +19,6 @@ import logging_aux
 import restclient
 import restserver
 from restclient import HpcRestClient
-
-CHECK_IDLE_INTERVAL = 60.0
-NODE_IDLE_TIMEOUT = 180.0
-MESOS_NODE_GROUP_NAME = "Mesos"
-MESOS_NODE_GROUP_DESCRIPTION = "The Mesos compute nodes in the cluster"
 
 
 class HpcpackFramwork(object):
@@ -51,10 +45,12 @@ class HpcpackFramwork(object):
         self.headnode = headnode
         self.ssl_thumbprint = ssl_thumbprint
         self.framework_uri = framework_uri
-        self.heartbeat_table = heartbeat_table.HeartBeatTable()
-        self.hpc_client = HpcRestClient()
-        self.heartbeat_table.subscribe_node_configuring(self.configure_compute_nodes_callback)
+        self.hpc_client = HpcRestClient()  # TODO: can we make hpc_client temp var?
+
+        self.heartbeat_table = heartbeat_table.HpcClusterManager(self.hpc_client)
+        self.heartbeat_table.subscribe_node_closed_callback(lambda l: map(self._kill_task_by_hostname, l))
         self.heartbeat_table.start()
+
         self.core_provisioning = 0.0
 
         '''
@@ -81,7 +77,6 @@ class HpcpackFramwork(object):
     def start(self):
         self.th.start()
         self.heartbeat_server.start()
-        self.check_runaway_and_idle_slave()
         while True and self.th.isAlive():
             try:
                 self.th.join(1)
@@ -202,106 +197,14 @@ class HpcpackFramwork(object):
     def _kill_task(self, host):
         self.logger.debug("Killing task {} on host {}".format(host.task_id, host.fqdn))
         self.driver.kill(host.agent_id, host.task_id)
-        self.heartbeat_table.on_slave_close(host.hostname)
 
     def _kill_task_by_hostname(self, hostname):
         (task_id, agent_id) = self.heartbeat_table.get_task_info(hostname)
         if task_id != "":
             self.logger.debug("Killing task {} on host {}".format(task_id, hostname))
             self.driver.kill(agent_id, task_id)
-            self.heartbeat_table.on_slave_close(hostname)
         else:
             self.logger.warn("Task info for host {} not found".format(hostname))
-
-    def check_runaway_and_idle_slave(self, start_timer=True):
-        (provision_timeout_list, heartbeat_timeout_list, running_list) = self.heartbeat_table.check_timeout()
-        self.logger.info("Get provision_timeout_list:{}".format(str(provision_timeout_list)))
-        self.logger.info("Get heartbeat_timeout_list:{}".format(str(heartbeat_timeout_list)))
-        timeout_lists = [provision_timeout_list, heartbeat_timeout_list]
-        for host in itertools.chain(*timeout_lists):
-            self._kill_task(host)
-
-        running_host_names = [host.hostname for host in running_list]
-        idle_nodes = self.hpc_client.check_nodes_idle(json.dumps(running_host_names))
-        self.logger.info("Get idle_nodes:{}".format(str(idle_nodes)))
-        idle_timeout_nodes = self._check_node_idle_timeout([node.node_name for node in idle_nodes])
-        self.logger.info("Get idle_timeout_nodes:{}".format(str(idle_timeout_nodes)))
-        for idle_timeout_node in idle_timeout_nodes:
-            self._kill_task_by_hostname(idle_timeout_node)
-
-        if start_timer:
-            timer = threading.Timer(CHECK_IDLE_INTERVAL, self.check_runaway_and_idle_slave)
-            timer.daemon = True
-            timer.start()
-
-    def _check_node_idle_timeout(self, node_names):
-        new_node_idle_check_table = {}
-        max_tolerance = NODE_IDLE_TIMEOUT / CHECK_IDLE_INTERVAL
-        for node_name in node_names:
-            if node_name in self.node_idle_check_table:
-                new_node_idle_check_table[node_name] = self.node_idle_check_table[node_name] + 1
-            else:
-                new_node_idle_check_table[node_name] = 1
-        self.node_idle_check_table = new_node_idle_check_table
-        return [name for name, value in self.node_idle_check_table.iteritems() if value > max_tolerance]
-
-    def configure_compute_nodes_callback(self, configuring_node_names):
-        if not configuring_node_names:
-            return []
-
-        groups = self.hpc_client.list_node_groups(MESOS_NODE_GROUP_NAME)
-        if MESOS_NODE_GROUP_NAME not in groups:
-            self.hpc_client.add_node_group(MESOS_NODE_GROUP_NAME, MESOS_NODE_GROUP_DESCRIPTION)
-
-        node_status_list = self.hpc_client.get_node_status_exact(configuring_node_names)
-        self.logger.info("Get node_status_list:{}".format(str(node_status_list)))
-        unapproved_node_list = []
-        take_offline_node_list = []
-        bring_online_node_list = []
-        change_node_group_node_list = []
-        configured_node_names = []
-        invalid_state_node_dict = {}
-        for node_status in node_status_list:
-            node_name = node_status["Name"]
-            node_state = node_status["NodeState"]
-            if node_status["NodeHealth"] == "Unapproved":
-                unapproved_node_list.append(node_name)
-            # node approved
-            elif MESOS_NODE_GROUP_NAME not in node_status["Groups"]:                
-                if node_state == "Online":
-                    take_offline_node_list.append(node_name)                
-                elif node_state == "Offline":
-                    change_node_group_node_list.append(node_name)
-                else:
-                    invalid_state_node_dict[node_name] = node_state
-            # node group properly set
-            elif node_state == "Offline":
-                bring_online_node_list.append(node_name)   
-            elif node_state == "Online":
-                # this node is all set
-                configured_node_names.append(node_name)
-            else:
-                invalid_state_node_dict[node_name] = node_state
-        try:
-            if invalid_state_node_dict:
-                self.logger.info("Node(s) in invalid state: {}".format(str(invalid_state_node_dict)))   
-            if unapproved_node_list:
-                self.logger.info("Assigning node template for node(s): {}".format(str(unapproved_node_list)))   
-                self.hpc_client.assign_default_compute_node_template(unapproved_node_list)
-            if take_offline_node_list:
-                self.logger.info("Taking node(s) offline: {}".format(str(take_offline_node_list)))   
-                self.hpc_client.take_nodes_offline(take_offline_node_list)
-            if bring_online_node_list:
-                self.logger.info("Bringing node(s) online: {}".format(str(bring_online_node_list)))   
-                self.hpc_client.bring_nodes_online(bring_online_node_list)
-            if change_node_group_node_list:
-                self.logger.info("Changing node group node(s): {}".format(str(change_node_group_node_list)))   
-                self.hpc_client.add_node_to_node_group(MESOS_NODE_GROUP_NAME, change_node_group_node_list)
-        except:
-            # Swallow all exceptions here. As we don't want any exception to prevent configured nodes to work
-            self.logger.exception('')                        
-        
-        return configured_node_names
 
 
 if __name__ == "__main__":  # TODO: handle various kinds of input params
@@ -312,6 +215,5 @@ if __name__ == "__main__":  # TODO: handle various kinds of input params
     else:
         hpcpack_framework = HpcpackFramwork("E:\\hpcsetup\\setupscript.ps1", "E:\\hpcsetup\\private.20180524.5b26f44.release.debug\\release.debug\\setup.exe",
                                             "mesoswinjd", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "mesoswinjd")
-        
-        hpcpack_framework.start()
 
+        hpcpack_framework.start()
