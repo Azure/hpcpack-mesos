@@ -1,7 +1,7 @@
 import datetime
 import unittest
 
-from heartbeat_table import HeartBeatTable, HpcState
+from heartbeat_table import HpcClusterManager, HpcState
 
 HOST1HOSTNAME = "host1hostname"
 HOST1FQDN = "host1hostname.fqdn.com"
@@ -40,21 +40,21 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         pass
 
     def test_fqdn_add_slaveinfo(self):
-        heartbeat_table = HeartBeatTable()
+        heartbeat_table = HpcClusterManager()
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
         (task_id, agent_id) = heartbeat_table.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
         self.assertEquals(agent_id, HOST1AGENTID)
 
     def test_hostname_add_slaveinfo(self):
-        heartbeat_table = HeartBeatTable()
+        heartbeat_table = HpcClusterManager()
         heartbeat_table.add_slaveinfo(HOST1HOSTNAME, HOST1AGENTID, HOST1TASKID1, 1)
         (task_id, agent_id) = heartbeat_table.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
         self.assertEquals(agent_id, HOST1AGENTID)
 
     def test_duplicated_add_slaveinfo(self):
-        heartbeat_table = HeartBeatTable()
+        heartbeat_table = HpcClusterManager()
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 2)
         (task_id, _) = heartbeat_table.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
@@ -63,7 +63,7 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         self.assertEquals(task_id, HOST1TASKID2)
 
     def test_same_hostname_add_slaveinfo(self):
-        heartbeat_table = HeartBeatTable()
+        heartbeat_table = HpcClusterManager()
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 2)
         (task_id, _) = heartbeat_table.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
@@ -72,7 +72,7 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         self.assertEquals(task_id, HOST1TASKID1)
 
     def test_host_state_change(self):
-        heartbeat_table = HeartBeatTable()
+        heartbeat_table = HpcClusterManager()
         self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Unknown)
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
         self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Provisioning)
@@ -86,7 +86,7 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Closed)
 
     def test_check_timeout(self):
-        heartbeat_table = HeartBeatTable(TENMINUTES, TENMINUTES)
+        heartbeat_table = HpcClusterManager(TENMINUTES, TENMINUTES)
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1, UTCNOW)
         # Provisioning state
         (provision_timeout_list, heartbeat_timeout_list, running_list) = heartbeat_table.check_timeout(UTCNOW + TENMINUTES - ONESEC)
@@ -119,7 +119,7 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         self.assertFalse(running_list)
 
     def test_get_cores_in_provisioning(self):
-        heartbeat_table = HeartBeatTable()
+        heartbeat_table = HpcClusterManager()
         self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 0)
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
         self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 1)
@@ -133,7 +133,7 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 0)
 
     def test_check_fqdn_collision(self):
-        heartbeat_table = HeartBeatTable()
+        heartbeat_table = HpcClusterManager()
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
         self.assertTrue(heartbeat_table.check_fqdn_collision(HOST1FQDN2))
         self.assertFalse(heartbeat_table.check_fqdn_collision(HOST1FQDN))

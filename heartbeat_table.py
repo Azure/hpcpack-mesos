@@ -16,7 +16,7 @@ class HpcClusterManager(object):
 
     def __init__(self, hpc_rest_client, provisioning_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=3)):
         # type: (HpcRestClient, timedelta, timedelta) -> ()
-        self._table = {}
+        self._heart_beat_table = {}
         self.node_idle_check_table = {}
         self.logger = logging_aux.init_logger_aux("hpcframework.clustermanager", "hpcframework.clustermanager.log")        
         self._table_lock = threading.Lock()
@@ -39,35 +39,35 @@ class HpcClusterManager(object):
     def add_slaveinfo(self, fqdn, agent_id, task_id, cpus, last_heartbeat=datetime.utcnow()):
         u_fqdn = fqdn.upper()
         hostname = self.__get_hostname_from_fqdn(u_fqdn)
-        if hostname in self._table:
-            if self._table[hostname].fqdn != u_fqdn:
+        if hostname in self._heart_beat_table:
+            if self._heart_beat_table[hostname].fqdn != u_fqdn:
                 self.logger.error("Duplicated hostname {} detected. Existing fqdn: {}, new fqdn {}. Ignore new heartbeat entry.".format(
-                    hostname, self._table[hostname].fqdn, u_fqdn))
+                    hostname, self._heart_beat_table[hostname].fqdn, u_fqdn))
                 return
-            elif self._table[hostname].state != HpcState.Closed:
-                self.logger.warn("Heart beat entry of {} existed. old value: {}.".format(hostname, str(self._table[hostname])))
+            elif self._heart_beat_table[hostname].state != HpcState.Closed:
+                self.logger.warn("Heart beat entry of {} existed. old value: {}.".format(hostname, str(self._heart_beat_table[hostname])))
         slaveinfo = SlaveInfo(hostname, u_fqdn, agent_id, task_id, cpus, last_heartbeat, HpcState.Provisioning)
-        self._table[hostname] = slaveinfo
+        self._heart_beat_table[hostname] = slaveinfo
         self.logger.info("Heart beat entry added: {}".format(str(slaveinfo)))
 
     def on_slave_heartbeat(self, hostname, now=datetime.utcnow()):
         u_hostname = hostname.upper()
-        if u_hostname in self._table:
-            self._table[u_hostname] = self._table[u_hostname]._replace(last_heartbeat=now)
+        if u_hostname in self._heart_beat_table:
+            self._heart_beat_table[u_hostname] = self._heart_beat_table[u_hostname]._replace(last_heartbeat=now)
             self.logger.info("Heatbeat from host {}".format(u_hostname))
-            if self._table[u_hostname].state == HpcState.Provisioning:
+            if self._heart_beat_table[u_hostname].state == HpcState.Provisioning:
                 with self._table_lock:
-                    if self._table[u_hostname].state == HpcState.Provisioning:
-                        self._table[u_hostname] = self._table[u_hostname]._replace(state=HpcState.Configuring)
+                    if self._heart_beat_table[u_hostname].state == HpcState.Provisioning:
+                        self._heart_beat_table[u_hostname] = self._heart_beat_table[u_hostname]._replace(state=HpcState.Configuring)
                         self.logger.info("Configuring Host {}".format(u_hostname))
         else:
             self.logger.error("Host {} is not recognized. Heartbeat ignored.".format(u_hostname))
-            self.logger.debug("_table {} ".format(self._table))
+            self.logger.debug("_table {} ".format(self._heart_beat_table))
 
     def get_task_info(self, hostname):
         u_hostname = hostname.upper()
-        if u_hostname in self._table:
-            entry = self._table[u_hostname]
+        if u_hostname in self._heart_beat_table:
+            entry = self._heart_beat_table[u_hostname]
             return (entry.task_id, entry.agent_id)
         else:
             self.logger.error("Host {} is not recognized. Failed to get task info.".format(u_hostname))
@@ -75,8 +75,8 @@ class HpcClusterManager(object):
 
     def get_host_state(self, hostname):
         u_hostname = hostname.upper()
-        if u_hostname in self._table:
-            entry = self._table[u_hostname]
+        if u_hostname in self._heart_beat_table:
+            entry = self._heart_beat_table[u_hostname]
             return entry.state
         else:
             self.logger.error("Host {} is not recognized. Failed to get host state.".format(u_hostname))
@@ -93,8 +93,8 @@ class HpcClusterManager(object):
     def check_fqdn_collision(self, fqdn):
         u_fqdn = fqdn.upper()
         hostname = self.__get_hostname_from_fqdn(u_fqdn)
-        if hostname in self._table:
-            if self._table[hostname].fqdn != u_fqdn:
+        if hostname in self._heart_beat_table:
+            if self._heart_beat_table[hostname].fqdn != u_fqdn:
                 return True
         return False
 
@@ -102,7 +102,7 @@ class HpcClusterManager(object):
         provision_timeout_list = []
         heartbeat_timeout_list = []
         running_list = []
-        for host in dict(self._table).itervalues():
+        for host in dict(self._heart_beat_table).itervalues():
             if host.state == HpcState.Provisioning and now - host.last_heartbeat >= self._provisioning_timeout:
                 self.logger.warn("Provisioning timeout: {}".format(str(host)))
                 provision_timeout_list.append(host)
@@ -116,7 +116,7 @@ class HpcClusterManager(object):
     
     def get_cores_in_provisioning(self):
         cores = 0.0
-        for host in dict(self._table).itervalues():
+        for host in dict(self._heart_beat_table).itervalues():
             if host.state == HpcState.Provisioning:
                 cores += host.cpus
         self.logger.info("Cores in provisioning: {}".format(cores))
@@ -125,7 +125,7 @@ class HpcClusterManager(object):
     def _configure_compute_nodes(self):
         configuring_node_names = []
         configured_node_names = []
-        for host in dict(self._table).itervalues():
+        for host in dict(self._heart_beat_table).itervalues():
             if host.state == HpcState.Configuring:
                 configuring_node_names.append(host.hostname)     
         if configuring_node_names:
@@ -133,8 +133,7 @@ class HpcClusterManager(object):
             configured_node_names = self._configure_compute_nodes_state_machine(configuring_node_names)            
         if configured_node_names:
             self.logger.info("Nodes configured: {}".format(configured_node_names)) 
-            for node_name in configured_node_names:
-                self._table[node_name.upper()]._replace(state=HpcState.Running)
+            self._set_nodes_running(configured_node_names)            
 
     def _configure_compute_nodes_state_machine(self, configuring_node_names):
         if not configuring_node_names:
@@ -247,24 +246,29 @@ class HpcClusterManager(object):
             for callback in self._node_closed_callbacks:
                 callback(closed_nodes)
 
+    def _set_nodes_running(self, node_names):
+        # type: (List[str]) -> ()        
+        self._set_node_state(node_names, HpcState.Running, "Running")
+
     def _set_node_state(self, node_names, node_state, state_name):
-        # type: (List[str], HpcState, str) -> ()
+        # type: (List[str], HpcState, str) -> List[str]
         setted_nodes = []
         for node_name in node_names:
             u_hostname = node_name.upper()
-            if u_hostname in self._table:
-                if self._table[u_hostname].state != node_state:
-                    old_state = self._table[u_hostname].state
-                    self._table[u_hostname] = self._table[u_hostname]._replace(state=node_state)
+            if u_hostname in self._heart_beat_table:
+                if self._heart_beat_table[u_hostname].state != node_state:
+                    old_state = self._heart_beat_table[u_hostname].state
+                    self._heart_beat_table[u_hostname] = self._heart_beat_table[u_hostname]._replace(state=node_state)
                     setted_nodes.append(u_hostname)
                     self.logger.info("Host {} set to {} from {}.".format(u_hostname, state_name, HpcState.Names[old_state]))
             else:
                 self.logger.error("Host {} is not recognized. State {} Ignored.".format(u_hostname, state_name))
+        return setted_nodes
 
     def _drain_and_stop_nodes(self):
         node_names_to_drain = []
         node_names_to_close = []
-        for host in dict(self._table).itervalues():
+        for host in dict(self._heart_beat_table).itervalues():
             if host.state == HpcState.Draining:
                 node_names_to_drain.append(host.hostname)
             elif host.state == HpcState.Closing:
@@ -300,7 +304,7 @@ class HpcClusterManager(object):
             if node_state == HpcRestClient.NODE_STATUS_NODE_STATE_ONLINE_VALUE:
                 take_offline_node_list.append(node_name)
             elif node_state == HpcRestClient.NODE_STATUS_NODE_STATE_OFFLINE_VALUE:
-                drained_node_names.append(node_names)
+                drained_node_names.append(node_name)
             else:
                 invalid_state_node_dict[node_name] = node_state
         try:
@@ -312,6 +316,8 @@ class HpcClusterManager(object):
         except:
             # Swallow all exceptions here. As we don't want any exception to prevent drained nodes to be closed
             self.logger.exception('Exception happened when draining compute node.')        
+
+        return drained_node_names
 
     def _close_node_state_machine(self, node_names):
         # type: List[str] -> List[str], List[str]
