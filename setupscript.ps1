@@ -1,11 +1,5 @@
 param([string]$setupPath = "C:\HPCPack2016\setup.exe", [string]$headnode = "", [string]$sslthumbprint = "", [string]$frameworkUri = "localhost")
 
-function Start-Daemon {	
-    $script = 'powershell.exe -noexit -EncodedCommand ' + $encodeddaemonScript + ' > daemon.log' 
-    $srcipt
-    Invoke-WmiMethod -path win32_process -name create -argumentlist $script
-}
-
 $createdMutex = ""
 $mutex = New-Object -TypeName system.threading.mutex($true, "Global\HpcMesos", [ref] $CreatedMutex)
 if (!$CreatedMutex) {
@@ -26,6 +20,16 @@ $setupPath
 $setupProc = Start-Process $setupPath -ArgumentList "-unattend -computenode:$headnode -sslthumbprint:$sslthumbprint" -PassThru
 #$setupProc = Start-Process "C:\HPCPack2016\private.20180308.251b491.release.debug\release.debug\setup.exe" -ArgumentList "-unattend -computenode:mesoswinagent -sslthumbprint:0386B1198B956BBAAA4154153B6CA1F44B6D1016" -PassThru
 $setupProc.WaitForExit()
+
+Write-Output "Set CCP_ env vars and registry"
+try {
+    [Environment]::SetEnvironmentVariable("CCP_CONNECTIONSTRING", $headnode, "Machine")
+    [Environment]::SetEnvironmentVariable("CCP_SCHEDULER", $headnode, "Machine")
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\HPC" -Name "ClusterConnectionString" -Value $headnode
+}
+catch {
+    $_
+}
 
 Write-Output "Start HPC Services if not already"
 # Other HPC service depend on SDM
