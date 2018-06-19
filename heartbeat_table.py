@@ -13,7 +13,8 @@ class HpcClusterManager(object):
 
     NODE_IDLE_TIMEOUT = 180.0
 
-    def __init__(self, hpc_rest_client, provisioning_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=3)):
+    # TODO: add configuration_timeout
+    def __init__(self, hpc_rest_client, provisioning_timeout=timedelta(minutes=15), heartbeat_timeout=timedelta(minutes=3), node_group=""):
         # type: (HpcRestClient, timedelta, timedelta) -> ()
         self._heart_beat_table = {}
         self._node_idle_check_table = {}
@@ -22,6 +23,7 @@ class HpcClusterManager(object):
         self._provisioning_timeout = provisioning_timeout
         self._heartbeat_timeout = heartbeat_timeout
         self._hpc_client = hpc_rest_client
+        self._node_group = node_group  # TODO: change to a centralized config
 
         self._node_idle_timedelta = timedelta(0, self.NODE_IDLE_TIMEOUT)
 
@@ -30,6 +32,9 @@ class HpcClusterManager(object):
 
     def __get_hostname_from_fqdn(self, fqdn):
         return fqdn.split('.')[0]
+
+    def _node_group_specified(self):
+        return self._node_group != ""
 
     '''
     callback has signature List[str] -> ()
@@ -147,6 +152,15 @@ class HpcClusterManager(object):
         if self.MESOS_NODE_GROUP_NAME not in groups:
             self._hpc_client.add_node_group(self.MESOS_NODE_GROUP_NAME, self.MESOS_NODE_GROUP_DESCRIPTION)
 
+        # We won't create target node group, but check if it exists
+        # Check after Mesos group has been created to support specified group is Mesos group
+        if self._node_group_specified():
+            target_group = self._hpc_client.list_node_groups(self._node_group)
+            if self._node_group.upper() not in (x.upper() for x in target_group):
+                self.logger.error(
+                    "Target node group is not created:{}. Stop configure compute nodes.".format(self._node_group))
+                return []
+
         node_status_list = self._hpc_client.get_node_status_exact(configuring_node_names)
         self.logger.info("Get node_status_list:{}".format(str(node_status_list)))
         unapproved_node_list = []
@@ -161,7 +175,7 @@ class HpcClusterManager(object):
             if node_status[HpcRestClient.NODE_STATUS_NODE_HEALTH_KEY] == HpcRestClient.NODE_STATUS_NODE_HEALTH_UNAPPROVED_VALUE:
                 unapproved_node_list.append(node_name)
             # node approved
-            elif self.MESOS_NODE_GROUP_NAME not in node_status[HpcRestClient.NODE_STATUS_NODE_GROUP_KEY]:
+            elif (self.MESOS_NODE_GROUP_NAME.upper() not in (x.upper() for x in node_status[HpcRestClient.NODE_STATUS_NODE_GROUP_KEY]) or (self._node_group_specified and self._node_group.upper() not in (x.upper() for x in node_status[HpcRestClient.NODE_STATUS_NODE_GROUP_KEY]))):
                 if node_state == HpcRestClient.NODE_STATUS_NODE_STATE_ONLINE_VALUE:
                     take_offline_node_list.append(node_name)
                 elif node_state == HpcRestClient.NODE_STATUS_NODE_STATE_OFFLINE_VALUE:
@@ -191,6 +205,8 @@ class HpcClusterManager(object):
             if change_node_group_node_list:
                 self.logger.info("Changing node group node(s): {}".format(str(change_node_group_node_list)))
                 self._hpc_client.add_node_to_node_group(self.MESOS_NODE_GROUP_NAME, change_node_group_node_list)
+                if self._node_group_specified():
+                    self._hpc_client.add_node_to_node_group(self._node_group, change_node_group_node_list)
         except:
             # Swallow all exceptions here. As we don't want any exception to prevent configured nodes to work
             self.logger.exception('Exception happened when configuring compute node.')
@@ -222,6 +238,7 @@ class HpcClusterManager(object):
                 new_node_idle_check_table[node_name] = datetime.now()
         self._node_idle_check_table = new_node_idle_check_table
         now = datetime.now()
+        self.logger.info("_check_node_idle_timeout: "+str(self._node_idle_check_table))
         return [name for name, value in self._node_idle_check_table.iteritems() if (now - value) > self._node_idle_timedelta]
 
     def start_configure_cluster_timer(self):

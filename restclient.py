@@ -12,8 +12,9 @@ IdleNode = namedtuple("IdleNode", "node_name timestamp server_name")
 
 # TODO: change all method inputs to either all in json format or not
 
+
 class HpcRestClient(object):
-    DEFAULT_NODEGROUP_TOKEN = "default"
+    DEFAULT_NODEGROUP_TOKEN = "DEFAULT"
     DEFAULT_COMPUTENODE_TEMPLATE = "Default ComputeNode Template"
     # auto-scale api set
     GROW_DECISION_API_ROUTE = "https://{}/HpcManager/api/auto-scale/grow-decision"
@@ -54,12 +55,12 @@ class HpcRestClient(object):
     def _get(self, function_name, function_route, params):
         headers = {"Content-Type": "application/json"}
         url = function_route.format(self.hostname)
-        res = requests.get(url, headers=headers, verify=False, params = params)        
+        res = requests.get(url, headers=headers, verify=False, params=params)
         try:
             res.raise_for_status()
             self._log_info(function_name, res)
             return res
-        except HTTPError:       
+        except HTTPError:
             self._log_error(function_name, res)
             raise
 
@@ -71,36 +72,42 @@ class HpcRestClient(object):
             res.raise_for_status()
             self._log_info(function_name, res)
             return res
-        except HTTPError:       
+        except HTTPError:
             self._log_error(function_name, res)
             raise
 
     # Starts auto-scale api
-    def get_grow_decision(self):
+    def get_grow_decision(self, node_group_name=""):
         url = self.GROW_DECISION_API_ROUTE.format(self.hostname)
         res = requests.post(url, verify=False)
         if res.ok:
             self.logger.info(res.content)
-            jobj = json.loads(res.content)[self.DEFAULT_NODEGROUP_TOKEN]
+            grow_decision_dict = {k.upper():v for k,v in json.loads(res.content).items()}
+            if node_group_name == "":
+                jobj = grow_decision_dict[self.DEFAULT_NODEGROUP_TOKEN]
+            elif node_group_name.upper() in grow_decision_dict:
+                jobj = grow_decision_dict[node_group_name.upper()]
+            else:
+                return GrowDecision(0, 0, 0)
             return GrowDecision(jobj['CoresToGrow'], jobj['NodesToGrow'], jobj['SocketsToGrow'])
         else:
             self.logger.error("status_code:{} content:{}".format(res.status_code, res.content))
 
     def check_nodes_idle(self, nodes):
         data = json.dumps(nodes)
-        res = self._post(self.check_nodes_idle.__name__, self.CHECK_NODES_IDLE_ROUTE, data)        
+        res = self._post(self.check_nodes_idle.__name__, self.CHECK_NODES_IDLE_ROUTE, data)
         jobjs = json.loads(res.content)
         return [IdleNode(idle_info['NodeName'], idle_info['TimeStamp'], idle_info['ServerName']) for idle_info in jobjs]
 
     # Starts node management api
     def bring_nodes_online(self, nodes):
         data = json.dumps(nodes)
-        res = self._post(self.bring_nodes_online.__name__, self.BRING_NODES_ONLINE_ROUTE, data)        
+        res = self._post(self.bring_nodes_online.__name__, self.BRING_NODES_ONLINE_ROUTE, data)
         return self._return_json_from_res(res)
 
     def take_nodes_offline(self, nodes):
         data = json.dumps(nodes)
-        res = self._post(self.take_nodes_offline.__name__, self.TAKE_NODES_OFFLINE_ROUTE, data)        
+        res = self._post(self.take_nodes_offline.__name__, self.TAKE_NODES_OFFLINE_ROUTE, data)
         return self._return_json_from_res(res)
 
     def assign_default_compute_node_template(self, nodename_arr):
@@ -122,11 +129,11 @@ class HpcRestClient(object):
         return self._return_json_from_res(res)
 
     # Starts node group api
-    def list_node_groups(self, group_name = ""):
+    def list_node_groups(self, group_name=""):
         params = {}
         if group_name != "":
             params['nodeGroupName'] = group_name
-        res = self._get(self.list_node_groups.__name__, self.LIST_NODE_GROUPS_ROUTE, params)        
+        res = self._get(self.list_node_groups.__name__, self.LIST_NODE_GROUPS_ROUTE, params)
         return self._return_json_from_res(res)
 
     def add_node_group(self, group_name, group_description=""):
@@ -135,12 +142,14 @@ class HpcRestClient(object):
         return self._return_json_from_res(res)
 
     def add_node_to_node_group(self, group_name, node_names):
-        res = self._post(self.add_node_to_node_group.__name__, self.ADD_NODES_TO_NODE_GROUP_ROUTE.format(group_name = group_name), json.dumps(node_names))
+        res = self._post(self.add_node_to_node_group.__name__, self.ADD_NODES_TO_NODE_GROUP_ROUTE.format(
+            group_name=group_name), json.dumps(node_names))
         return self._return_json_from_res(res)
 
     def _return_json_from_res(self, res):
         jobj = json.loads(res.content)
-        return jobj    
+        return jobj
+
 
 if __name__ == '__main__':
     client = HpcRestClient()

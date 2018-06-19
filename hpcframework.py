@@ -34,7 +34,7 @@ class HpcpackFramwork(object):
             except KeyboardInterrupt:
                 print('Stop requested by user, stopping framework....')
 
-    def __init__(self, script_path="", setup_path="", headnode="", ssl_thumbprint="", framework_uri=""):
+    def __init__(self, script_path="", setup_path="", headnode="", ssl_thumbprint="", framework_uri="", node_group=""):
         logging.basicConfig()
         self.logger = logging_aux.init_logger_aux("hpcframework", "hpcframework.log")
         # signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -45,9 +45,10 @@ class HpcpackFramwork(object):
         self.headnode = headnode
         self.ssl_thumbprint = ssl_thumbprint
         self.framework_uri = framework_uri
+        self.node_group = node_group
         self.hpc_client = HpcRestClient()  # TODO: can we make hpc_client temp var?
 
-        self.heartbeat_table = heartbeat_table.HpcClusterManager(self.hpc_client)
+        self.heartbeat_table = heartbeat_table.HpcClusterManager(self.hpc_client, node_group=self.node_group)
         self.heartbeat_table.subscribe_node_closed_callback(lambda l: map(self._kill_task_by_hostname, l))
         self.heartbeat_table.start()
 
@@ -110,7 +111,11 @@ class HpcpackFramwork(object):
     def offer_received(self, offers):
         try:
             # self.logger.info('OFFER: %s' % (str(offers)))
-            grow_decision = self.hpc_client.get_grow_decision()
+            if self.node_group == "":
+                grow_decision = self.hpc_client.get_grow_decision()
+            else:
+                grow_decision = self.hpc_client.get_grow_decision(self.node_group)
+
             if grow_decision is None:
                 cores_to_grow = 0
             else:
@@ -126,11 +131,20 @@ class HpcpackFramwork(object):
                     if 'attributes' in offer_dict:
                         attributes = offer_dict['attributes']
                         if self.get_text(attributes, 'os') == 'windows_server':
-                            cores = self.get_scalar(attributes, 'cores')
-                            cpus = self.get_scalar(offer_dict['resources'], 'cpus')
-                            if cores == cpus:
-                                if not self.heartbeat_table.check_fqdn_collision(offer_dict['hostname']):
-                                    take_offer = True
+                            match_node_group = False
+                            if self.node_group == "":
+                                match_node_group = True
+                            elif self.get_text(attributes, 'node_group').upper() == self.node_group.upper():
+                                match_node_group = True
+                            else:
+                                match_node_group = False
+
+                            if match_node_group:
+                                cores = self.get_scalar(attributes, 'cores')
+                                cpus = self.get_scalar(offer_dict['resources'], 'cpus')
+                                if cores == cpus:
+                                    if not self.heartbeat_table.check_fqdn_collision(offer_dict['hostname']):
+                                        take_offer = True
                 if take_offer:
                     cores_to_grow -= cpus
                     self.accept_offer(offer)
@@ -214,6 +228,6 @@ if __name__ == "__main__":  # TODO: handle various kinds of input params
         hpcpack_framework.start()
     else:
         hpcpack_framework = HpcpackFramwork("E:\\hpcsetup\\setupscript.ps1", "E:\\hpcsetup\\private.20180524.5b26f44.release.debug\\release.debug\\setup.exe",
-                                            "mesoswinjd", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "mesoswinjd")
+                                            "mesoswinjd", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "mesoswinjd", "mesossub1")
 
         hpcpack_framework.start()
