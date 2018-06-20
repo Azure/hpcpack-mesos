@@ -8,6 +8,7 @@ name = "pypi"
 [packages]
 requests = "*"
 mesoshttp = "*"
+typing = "*"
 
 [requires]
 python_version = "2.7"
