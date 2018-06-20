@@ -69,7 +69,7 @@ class HpcpackFramwork(object):
         self.driver = None  # type: MesosClient.SchedulerDriver
         framework_suffix = self.headnode.replace(',', '_')
         if self.node_group != "":
-            framework_suffix = framework_suffix + '-' + self.node_group;
+            framework_suffix = framework_suffix + '-' + self.node_group
         self.mesos_client = MesosClient(mesos_urls=['http://172.16.1.4:5050'], frameworkName="HPC-Pack-Framework-{}".format(framework_suffix))
         # self.mesos_client = MesosClient(mesos_urls=['zk://127.0.0.1:2181/mesos'])
         self.mesos_client.on(MesosClient.SUBSCRIBED, self.subscribed)
