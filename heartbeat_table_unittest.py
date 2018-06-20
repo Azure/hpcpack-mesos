@@ -2,6 +2,7 @@ import datetime
 import unittest
 
 from heartbeat_table import HpcClusterManager, HpcState
+from mock import patch
 
 HOST1HOSTNAME = "host1hostname"
 HOST1FQDN = "host1hostname.fqdn.com"
@@ -39,22 +40,25 @@ class HeartbeatTableUnitTest(unittest.TestCase):
     def setUp(self):
         pass
 
-    def test_fqdn_add_slaveinfo(self):
-        heartbeat_table = HpcClusterManager()
+    @patch("heartbeat_table.HpcRestClient", autospec=True)
+    def test_fqdn_add_slaveinfo(self, mock_restc):
+        heartbeat_table = HpcClusterManager(mock_restc)
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
         (task_id, agent_id) = heartbeat_table.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
         self.assertEquals(agent_id, HOST1AGENTID)
 
-    def test_hostname_add_slaveinfo(self):
-        heartbeat_table = HpcClusterManager()
+    @patch("heartbeat_table.HpcRestClient", autospec=True)
+    def test_hostname_add_slaveinfo(self, mock_restc):
+        heartbeat_table = HpcClusterManager(mock_restc)
         heartbeat_table.add_slaveinfo(HOST1HOSTNAME, HOST1AGENTID, HOST1TASKID1, 1)
         (task_id, agent_id) = heartbeat_table.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
         self.assertEquals(agent_id, HOST1AGENTID)
 
-    def test_duplicated_add_slaveinfo(self):
-        heartbeat_table = HpcClusterManager()
+    @patch("heartbeat_table.HpcRestClient", autospec=True)
+    def test_duplicated_add_slaveinfo(self, mock_restc):
+        heartbeat_table = HpcClusterManager(mock_restc)
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 2)
         (task_id, _) = heartbeat_table.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
@@ -62,8 +66,9 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         (task_id, _) = heartbeat_table.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID2)
 
-    def test_same_hostname_add_slaveinfo(self):
-        heartbeat_table = HpcClusterManager()
+    @patch("heartbeat_table.HpcRestClient", autospec=True)
+    def test_same_hostname_add_slaveinfo(self, mock_restc):
+        heartbeat_table = HpcClusterManager(mock_restc)
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 2)
         (task_id, _) = heartbeat_table.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
@@ -71,22 +76,28 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         (task_id, _) = heartbeat_table.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
 
-    def test_host_state_change(self):
-        heartbeat_table = HpcClusterManager()
+    @patch("heartbeat_table.HpcRestClient", autospec=True)
+    def test_host_state_change(self, mock_restc):
+        heartbeat_table = HpcClusterManager(mock_restc)
         self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Unknown)
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
         self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Provisioning)
         heartbeat_table.on_slave_heartbeat(HOST1HOSTNAME)
-        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Running)
+        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Configuring)
         heartbeat_table.on_slave_heartbeat(HOST1HOSTNAME)
+        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Configuring)
+        heartbeat_table._set_nodes_running([HOST1HOSTNAME])
         self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Running)
-        heartbeat_table.on_slave_close(HOST1HOSTNAME)
-        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Closed)
-        heartbeat_table.on_slave_heartbeat(HOST1HOSTNAME)
+        heartbeat_table._set_nodes_draining([HOST1HOSTNAME])
+        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Draining)
+        heartbeat_table._set_nodes_closing([HOST1HOSTNAME])
+        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Closing)
+        heartbeat_table._set_nodes_closed([HOST1HOSTNAME])
         self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Closed)
 
-    def test_check_timeout(self):
-        heartbeat_table = HpcClusterManager(TENMINUTES, TENMINUTES)
+    @patch("heartbeat_table.HpcRestClient", autospec=True)
+    def test_check_timeout(self, mock_restc):
+        heartbeat_table = HpcClusterManager(mock_restc , TENMINUTES, TENMINUTES)
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1, UTCNOW)
         # Provisioning state
         (provision_timeout_list, heartbeat_timeout_list, running_list) = heartbeat_table.check_timeout(UTCNOW + TENMINUTES - ONESEC)
@@ -97,8 +108,11 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         self.assertEqual(provision_timeout_list[0].hostname, HOST1HOSTNAME.upper())
         self.assertFalse(heartbeat_timeout_list)
         self.assertFalse(running_list)
-        # Running state
+        # Heart beat will lead into Configuring state
         heartbeat_table.on_slave_heartbeat(HOST1HOSTNAME, UTCNOW)
+        # TODO: Add and test configuring timeout
+        # Running state
+        heartbeat_table._set_nodes_running([HOST1HOSTNAME])
         (provision_timeout_list, heartbeat_timeout_list, running_list) = heartbeat_table.check_timeout(UTCNOW + TENMINUTES - ONESEC)
         self.assertFalse(provision_timeout_list)
         self.assertFalse(heartbeat_timeout_list)
@@ -108,7 +122,7 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         self.assertEqual(heartbeat_timeout_list[0].hostname, HOST1HOSTNAME.upper())
         self.assertFalse(running_list)
         # Close state
-        heartbeat_table.on_slave_close(HOST1HOSTNAME)
+        heartbeat_table._set_nodes_closed([HOST1HOSTNAME])
         (provision_timeout_list, heartbeat_timeout_list, running_list) = heartbeat_table.check_timeout(UTCNOW + TENMINUTES - ONESEC)
         self.assertFalse(provision_timeout_list)
         self.assertFalse(heartbeat_timeout_list)
@@ -118,22 +132,32 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         self.assertFalse(heartbeat_timeout_list)
         self.assertFalse(running_list)
 
-    def test_get_cores_in_provisioning(self):
-        heartbeat_table = HpcClusterManager()
+    @patch("heartbeat_table.HpcRestClient", autospec=True)
+    def test_get_cores_in_provisioning(self, mock_restc):
+        heartbeat_table = HpcClusterManager(mock_restc)
         self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 0)
+        # Add 1 core
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
         self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 1)
+        # Add 2 cores
         heartbeat_table.add_slaveinfo(HOST2FQDN, HOST2AGENTID, HOST2TASKID1, 2)
         self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 3)
+        # Get 2 cores to configuring
         heartbeat_table.on_slave_heartbeat(HOST2HOSTNAME)
-        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 1)
+        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 3)
+        # Get same 2 cores to configuring
         heartbeat_table.on_slave_heartbeat(HOST2HOSTNAME)
-        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 1)
-        heartbeat_table.on_slave_close(HOST1HOSTNAME)
-        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 0)
+        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 3)
+        # Get 1 core to running
+        heartbeat_table._set_nodes_running([HOST1HOSTNAME])
+        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 2)
+        # Get 1 core to closed
+        heartbeat_table._set_nodes_closed([HOST1HOSTNAME])
+        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 2)
 
-    def test_check_fqdn_collision(self):
-        heartbeat_table = HpcClusterManager()
+    @patch("heartbeat_table.HpcRestClient", autospec=True)
+    def test_check_fqdn_collision(self, mock_restc):
+        heartbeat_table = HpcClusterManager(mock_restc)
         heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
         self.assertTrue(heartbeat_table.check_fqdn_collision(HOST1FQDN2))
         self.assertFalse(heartbeat_table.check_fqdn_collision(HOST1FQDN))
