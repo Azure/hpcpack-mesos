@@ -92,7 +92,7 @@ class HpcFrameworkUnitTest(unittest.TestCase):
         mock_accept_offer.assert_has_calls(calls)
         mock_decline_offer.assert_called_with(offer3)
 
-    @patch('heartbeat_table.HeartBeatTable.get_cores_in_provisioning')
+    @patch('heartbeat_table.HpcClusterManager.get_cores_in_provisioning')
     @patch('hpcframework.HpcpackFramwork.decline_offer')
     @patch('hpcframework.HpcpackFramwork.accept_offer')
     @patch('restclient.HpcRestClient.get_grow_decision')
@@ -108,7 +108,7 @@ class HpcFrameworkUnitTest(unittest.TestCase):
         mock_accept_offer.assert_has_calls(calls)
         mock_decline_offer.assert_not_called()
 
-    @patch('heartbeat_table.HeartBeatTable.get_cores_in_provisioning')
+    @patch('heartbeat_table.HpcClusterManager.get_cores_in_provisioning')
     @patch('hpcframework.HpcpackFramwork.decline_offer')
     @patch('hpcframework.HpcpackFramwork.accept_offer')
     @patch('restclient.HpcRestClient.get_grow_decision')
@@ -124,27 +124,8 @@ class HpcFrameworkUnitTest(unittest.TestCase):
         mock_accept_offer.assert_called_with(offer1)
         mock_decline_offer.assert_has_calls(calls)
 
-    @patch('hpcframework.HpcpackFramwork._check_node_idle_timeout')
-    @patch('hpcframework.HpcpackFramwork._kill_task_by_hostname')
-    @patch('hpcframework.HpcpackFramwork._kill_task')
-    @patch('restclient.HpcRestClient.check_nodes_idle')
-    @patch('heartbeat_table.HeartBeatTable.check_timeout')
-    def test_check_runaway_and_idle_slave(self, mock_check_timeout, mock_check_nodes_idle, mock__kill_task, mock__kill_task_by_hostname, mock__check_node_idle_timeout):
-        def create_mock_host(name):
-            return MagicMock(hostname=name)
-        host1 = create_mock_host("host1")
-        host2 = create_mock_host("host2")
-        host3 = create_mock_host("host3")
-        host4 = create_mock_host("host4")        
-        mock_check_timeout.return_value = ([host1], [host2], [host3, host4])
-        mock__check_node_idle_timeout.return_value = ["host4"]
-        self.hpcpackFramework.check_runaway_and_idle_slave(False)
-        calls = [call(host1), call(host2)]
-        mock__kill_task.assert_has_calls(calls)
-        mock__kill_task_by_hostname.assert_called_with("host4")
-
-    @patch('heartbeat_table.HeartBeatTable.check_fqdn_collision')
-    @patch('heartbeat_table.HeartBeatTable.get_cores_in_provisioning')
+    @patch('heartbeat_table.HpcClusterManager.check_fqdn_collision')
+    @patch('heartbeat_table.HpcClusterManager.get_cores_in_provisioning')
     @patch('hpcframework.HpcpackFramwork.decline_offer')
     @patch('hpcframework.HpcpackFramwork.accept_offer')
     @patch('restclient.HpcRestClient.get_grow_decision')
@@ -168,20 +149,6 @@ class HpcFrameworkUnitTest(unittest.TestCase):
         self.hpcpackFramework.offer_received(offers)
         mock_accept_offer.assert_not_called()
         mock_decline_offer.assert_called_with(offer)
-
-    def test__check_node_idle_timeout(self):
-        res = self.hpcpackFramework._check_node_idle_timeout(["node1", "node2"])
-        self.assertFalse(res)        
-        res = self.hpcpackFramework._check_node_idle_timeout(["node1", "node2"])
-        self.assertFalse(res)        
-        res = self.hpcpackFramework._check_node_idle_timeout(["node1", "node3"])
-        self.assertFalse(res)        
-        res= self.hpcpackFramework._check_node_idle_timeout(["node1", "node2"])
-        self.assertEquals(res, ["node1"])
-        res = self.hpcpackFramework._check_node_idle_timeout(["node1", "node2"])
-        self.assertEquals(res, ["node1"])
-
-
 
 if __name__ == '__main__':
     unittest.main()

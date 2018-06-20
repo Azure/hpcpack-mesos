@@ -162,6 +162,12 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         self.assertTrue(heartbeat_table.check_fqdn_collision(HOST1FQDN2))
         self.assertFalse(heartbeat_table.check_fqdn_collision(HOST1FQDN))
 
+    '''
+    TODO: Add test cases for
+        1. node idle time out
+        2. runaway nodes
+    '''
+
 
 if __name__ == '__main__':
     unittest.main()
