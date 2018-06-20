@@ -2,6 +2,7 @@ import threading
 from collections import namedtuple
 from datetime import datetime, timedelta
 from restclient import HpcRestClient
+from typing import Iterable
 import logging_aux
 
 
@@ -15,8 +16,9 @@ class HpcClusterManager(object):
     # TODO: add configuration_timeout
     def __init__(self, hpc_rest_client, provisioning_timeout=timedelta(minutes=15),
                  heartbeat_timeout=timedelta(minutes=3), node_group=""):
-        # type: (HpcRestClient, timedelta, timedelta) -> ()
-        self._heart_beat_table = {}
+        # type: (HpcRestClient, timedelta, timedelta, str) -> ()
+        self._heart_beat_table = {}   # type: dict[str, SlaveInfo]
+        self._removed_nodes = set()  # type: set[str]
         self._node_idle_check_table = {}
         self.logger = logging_aux.init_logger_aux("hpcframework.clustermanager", "hpcframework.clustermanager.log")
         self._table_lock = threading.Lock()
@@ -60,6 +62,7 @@ class HpcClusterManager(object):
         self.logger.info("Heart beat entry added: {}".format(str(slaveinfo)))
 
     def on_slave_heartbeat(self, hostname, now=datetime.utcnow()):
+        # type: (str, datetime) -> ()
         u_hostname = hostname.upper()
         if u_hostname in self._heart_beat_table:
             self._heart_beat_table[u_hostname] = self._heart_beat_table[u_hostname]._replace(last_heartbeat=now)
@@ -237,11 +240,15 @@ class HpcClusterManager(object):
 
     def _check_node_idle_timeout(self, node_names):
         new_node_idle_check_table = {}
-        for node_name in node_names:
-            if node_name in self._node_idle_check_table:
-                new_node_idle_check_table[node_name] = self._node_idle_check_table[node_name]
+        for u_node_name in self._upper_strings(node_names):
+            if u_node_name in self._node_idle_check_table:
+                if u_node_name in self._removed_nodes:
+                    new_node_idle_check_table[u_node_name] = datetime.now()
+                    self._removed_nodes.discard(u_node_name)
+                else:
+                    new_node_idle_check_table[u_node_name] = self._node_idle_check_table[u_node_name]
             else:
-                new_node_idle_check_table[node_name] = datetime.now()
+                new_node_idle_check_table[u_node_name] = datetime.now()
         self._node_idle_check_table = new_node_idle_check_table
         now = datetime.now()
         self.logger.info("_check_node_idle_timeout: " + str(self._node_idle_check_table))
@@ -261,14 +268,17 @@ class HpcClusterManager(object):
 
     def _set_nodes_draining(self, node_names):
         # type: (list[str]) -> ()
+        self._removed_nodes.update(self._upper_strings(node_names))
         self._set_node_state(node_names, HpcState.Draining, "Draining")
 
     def _set_nodes_closing(self, node_names):
         # type: (list[str]) -> ()
+        self._removed_nodes.update(self._upper_strings(node_names))
         self._set_node_state(node_names, HpcState.Closing, "Closing")
 
     def _set_nodes_closed(self, node_names):
         # type: (list[str]) -> ()
+        self._removed_nodes.update(self._upper_strings(node_names))
         closed_nodes = self._set_node_state(node_names, HpcState.Closed, "Closed")
         if self._node_closed_callbacks:
             for callback in self._node_closed_callbacks:
@@ -381,6 +391,10 @@ class HpcClusterManager(object):
             self.logger.exception('Exception happened when configuring compute node.')
 
         return closed_node, re_drain_node_names
+
+    def _upper_strings(self, strs):
+        # type: (Iterable[str]) -> Iterable[str]
+        return (x.upper() for x in strs)
 
 
 SlaveInfo = namedtuple("SlaveInfo", "hostname fqdn agent_id task_id cpus last_heartbeat state")
