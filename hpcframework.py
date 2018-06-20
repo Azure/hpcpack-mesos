@@ -1,22 +1,14 @@
 import base64
 import codecs
-import json
 import logging
-import os
-import signal
-import sys
 import threading
-import time
 import uuid
-from collections import namedtuple
-from datetime import datetime
 
 from mesoshttp.client import MesosClient
 from mesoshttp.offers import Offer
 
 import heartbeat_table
 import logging_aux
-import restclient
 import restserver
 from restclient import HpcRestClient
 

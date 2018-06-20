@@ -124,6 +124,7 @@ class HpcRestClient(object):
         return self._return_json_from_res(res)
 
     def get_node_status_exact(self, node_names):
+        # type: (list[str]) -> list[dict[str, any]]
         params = json.dumps({"nodeNames": node_names})
         res = self._post(self.get_node_status_exact.__name__, self.NODE_STATUS_EXACT_ROUTE, params)
         return self._return_json_from_res(res)
