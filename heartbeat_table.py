@@ -1,9 +1,11 @@
 import threading
 from collections import namedtuple
 from datetime import datetime, timedelta
-from restclient import HpcRestClient
-from typing import Iterable
+
+from typing import Iterable, Callable
+
 import logging_aux
+from restclient import HpcRestClient
 
 
 class HpcClusterManager(object):
@@ -17,7 +19,7 @@ class HpcClusterManager(object):
     def __init__(self, hpc_rest_client, provisioning_timeout=timedelta(minutes=15),
                  heartbeat_timeout=timedelta(minutes=3), node_group=""):
         # type: (HpcRestClient, timedelta, timedelta, str) -> ()
-        self._heart_beat_table = {}   # type: dict[str, SlaveInfo]
+        self._heart_beat_table = {}  # type: dict[str, SlaveInfo]
         self._removed_nodes = set()  # type: set[str]
         self._node_idle_check_table = {}
         self.logger = logging_aux.init_logger_aux("hpcframework.clustermanager", "hpcframework.clustermanager.log")
@@ -30,7 +32,7 @@ class HpcClusterManager(object):
         self._node_idle_timedelta = timedelta(0, self.NODE_IDLE_TIMEOUT)
 
         # callbacks
-        self._node_closed_callbacks = []
+        self._node_closed_callbacks = []  # type: list[Callable[[list[str]], ()]]
 
     def __get_hostname_from_fqdn(self, fqdn):
         return fqdn.split('.')[0]
@@ -38,11 +40,8 @@ class HpcClusterManager(object):
     def _node_group_specified(self):
         return self._node_group != ""
 
-    '''
-    callback has signature List[str] -> ()
-    '''
-
     def subscribe_node_closed_callback(self, callback):
+        # type: (Callable[[list[str]], ()]) -> ()
         self._node_closed_callbacks.append(callback)
 
     def add_slaveinfo(self, fqdn, agent_id, task_id, cpus, last_heartbeat=datetime.utcnow()):
@@ -81,10 +80,10 @@ class HpcClusterManager(object):
         u_hostname = hostname.upper()
         if u_hostname in self._heart_beat_table:
             entry = self._heart_beat_table[u_hostname]
-            return (entry.task_id, entry.agent_id)
+            return entry.task_id, entry.agent_id
         else:
             self.logger.error("Host {} is not recognized. Failed to get task info.".format(u_hostname))
-            return ("", "")
+            return "", ""
 
     def get_host_state(self, hostname):
         u_hostname = hostname.upper()
@@ -95,7 +94,7 @@ class HpcClusterManager(object):
             self.logger.error("Host {} is not recognized. Failed to get host state.".format(u_hostname))
             return HpcState.Unknown
 
-    def __exec_callback(self, callbacks):
+    def _exec_callback(self, callbacks):
         for callback in callbacks:
             try:
                 self.logger.debug('Callback %s on %s' % (callback.__name__))
@@ -176,25 +175,21 @@ class HpcClusterManager(object):
         for node_status in node_status_list:
             node_name = node_status[HpcRestClient.NODE_STATUS_NODE_NAME_KEY]
             node_state = node_status[HpcRestClient.NODE_STATUS_NODE_STATE_KEY]
-            if node_status[
-                HpcRestClient.NODE_STATUS_NODE_HEALTH_KEY] == HpcRestClient.NODE_STATUS_NODE_HEALTH_UNAPPROVED_VALUE:
+            if self._check_node_health_unapproved(node_status):
                 unapproved_node_list.append(node_name)
             # node approved
-            elif (self.MESOS_NODE_GROUP_NAME.upper() not in (x.upper() for x in
-                                                             node_status[HpcRestClient.NODE_STATUS_NODE_GROUP_KEY]) or (
-                          self._node_group_specified() and self._node_group.upper() not in (x.upper() for x in
-                                                                                          node_status[
-                                                                                              HpcRestClient.NODE_STATUS_NODE_GROUP_KEY]))):
-                if node_state == HpcRestClient.NODE_STATUS_NODE_STATE_ONLINE_VALUE:
+            elif (self._check_node_in_mesos_group(node_status) or (
+                    self._node_group_specified() and self._check_node_in_specified_group(node_status))):
+                if self._check_node_state_online(node_status):
                     take_offline_node_list.append(node_name)
-                elif node_state == HpcRestClient.NODE_STATUS_NODE_STATE_OFFLINE_VALUE:
+                elif self._check_node_state_offline(node_status):
                     change_node_group_node_list.append(node_name)
                 else:
                     invalid_state_node_dict[node_name] = node_state
             # node group properly set
-            elif node_state == HpcRestClient.NODE_STATUS_NODE_STATE_OFFLINE_VALUE:
+            elif self._check_node_state_offline(node_status):
                 bring_online_node_list.append(node_name)
-            elif node_state == HpcRestClient.NODE_STATUS_NODE_STATE_ONLINE_VALUE:
+            elif self._check_node_state_online(node_status):
                 # this node is all set
                 configured_node_names.append(node_name)
             else:
@@ -340,9 +335,9 @@ class HpcClusterManager(object):
         for node_status in node_status_list:
             node_name = node_status[HpcRestClient.NODE_STATUS_NODE_NAME_KEY]
             node_state = node_status[HpcRestClient.NODE_STATUS_NODE_STATE_KEY]
-            if node_state == HpcRestClient.NODE_STATUS_NODE_STATE_ONLINE_VALUE:
+            if self._check_node_state_online(node_status):
                 take_offline_node_list.append(node_name)
-            elif node_state == HpcRestClient.NODE_STATUS_NODE_STATE_OFFLINE_VALUE:
+            elif self._check_node_state_offline(node_status):
                 drained_node_names.append(node_name)
             else:
                 invalid_state_node_dict[node_name] = node_state
@@ -367,13 +362,11 @@ class HpcClusterManager(object):
         node_status_list = self._hpc_client.get_node_status_exact(node_names)
         for node_status in node_status_list:
             node_name = node_status[HpcRestClient.NODE_STATUS_NODE_NAME_KEY]
-            node_state = node_status[HpcRestClient.NODE_STATUS_NODE_STATE_KEY]
-            if node_status[
-                HpcRestClient.NODE_STATUS_NODE_HEALTH_KEY] == HpcRestClient.NODE_STATUS_NODE_HEALTH_UNAPPROVED_VALUE:
+            if self._check_node_health_unapproved(node_status):
                 # already removed node
                 closed_node.append(node_name)
             else:
-                if node_state != HpcRestClient.NODE_STATUS_NODE_STATE_OFFLINE_VALUE:
+                if not self._check_node_state_offline(node_status):
                     # node is not properly drained
                     re_drain_node_names.append(node_name)
                 else:
@@ -396,6 +389,32 @@ class HpcClusterManager(object):
         # type: (Iterable[str]) -> Iterable[str]
         return (x.upper() for x in strs)
 
+    def _check_node_health_unapproved(self, node_status):
+        return node_status[
+                   HpcRestClient.NODE_STATUS_NODE_HEALTH_KEY] == HpcRestClient.NODE_STATUS_NODE_HEALTH_UNAPPROVED_VALUE
+
+    def _check_node_in_mesos_group(self, node_status):
+        # type: (dict[str, any]) -> bool
+        return self.MESOS_NODE_GROUP_NAME.upper() not in self._upper_strings(
+            node_status[HpcRestClient.NODE_STATUS_NODE_GROUP_KEY])
+
+    def _check_node_in_specified_group(self, node_status):
+        # type: (dict[str, any]) -> bool
+        return self._node_group.upper() not in self._upper_strings(
+            node_status[
+                HpcRestClient.NODE_STATUS_NODE_GROUP_KEY])
+
+    def _check_node_state(self, node_status, target_state):
+        # type: (dict[str, any], str) -> bool
+        return node_status[HpcRestClient.NODE_STATUS_NODE_STATE_KEY] == target_state
+
+    def _check_node_state_offline(self, node_status):
+        # type: (dict[str, any]) -> bool
+        return self._check_node_state(node_status, HpcRestClient.NODE_STATUS_NODE_STATE_OFFLINE_VALUE)
+
+    def _check_node_state_online(self, node_status):
+        # type: (dict[str, any]) -> bool
+        return self._check_node_state(node_status, HpcRestClient.NODE_STATUS_NODE_STATE_ONLINE_VALUE)
 
 SlaveInfo = namedtuple("SlaveInfo", "hostname fqdn agent_id task_id cpus last_heartbeat state")
 
