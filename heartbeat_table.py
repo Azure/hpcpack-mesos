@@ -1,7 +1,7 @@
 import threading
 from datetime import datetime, timedelta
 
-from typing import Iterable, Callable, NamedTuple, Set, Dict
+from typing import Iterable, Callable, NamedTuple, Set, Dict, List, Tuple
 
 import logging_aux
 from restclient import HpcRestClient
@@ -18,12 +18,13 @@ def _upper_strings(strs):
 
 
 def _check_node_health_unapproved(node_status):
+    # type: (Dict[str, any]) -> bool
     return node_status[
                HpcRestClient.NODE_STATUS_NODE_HEALTH_KEY] == HpcRestClient.NODE_STATUS_NODE_HEALTH_UNAPPROVED_VALUE
 
 
 def _find_missing_nodes(rq_nodes, res_nodes):
-    # type: ([str], [str]) -> [str]
+    # type: (List[str], List[str]) -> List[str]
     return [name for name in rq_nodes if name not in res_nodes]
 
 
@@ -45,6 +46,21 @@ def _check_node_state_online(node_status):
 def _get_hostname_from_fqdn(fqdn):
     # type: (str) -> str
     return fqdn.split('.')[0]
+
+
+def _get_node_name_from_status(node_status):
+    # type: (dict[str, any]) -> str
+    return node_status[HpcRestClient.NODE_STATUS_NODE_NAME_KEY]
+
+
+def _get_node_names_from_status(node_status_list):
+    # type: (List[Dict[str, any]]) -> List[str]
+    return map(_get_node_name_from_status, node_status_list)
+
+
+def _get_node_state_from_status(node_status):
+    # type: (dict[str, any]) -> str
+    return node_status[HpcRestClient.NODE_STATUS_NODE_STATE_KEY]
 
 
 class HpcClusterManager(object):
@@ -125,7 +141,7 @@ class HpcClusterManager(object):
             return "", ""
 
     def get_host_state(self, hostname):
-        # type: (str) -> HpcState
+        # type: (str) -> int
         u_hostname = hostname.upper()
         if u_hostname in self._heart_beat_table:
             entry = self._heart_beat_table[u_hostname]
@@ -212,7 +228,7 @@ class HpcClusterManager(object):
         configured_node_names = []
         invalid_state_node_dict = {}
         for node_status in node_status_list:
-            node_name = node_status[HpcRestClient.NODE_STATUS_NODE_NAME_KEY]
+            node_name = _get_node_name_from_status(node_status)
             node_state = node_status[HpcRestClient.NODE_STATUS_NODE_STATE_KEY]
             if _check_node_health_unapproved(node_status):
                 unapproved_node_list.append(node_name)
@@ -234,9 +250,7 @@ class HpcClusterManager(object):
             else:
                 invalid_state_node_dict[node_name] = node_state
 
-        missing_nodes = _find_missing_nodes(configuring_node_names,
-                                            (node[HpcRestClient.NODE_STATUS_NODE_NAME_KEY] for node in
-                                             node_status_list))
+        missing_nodes = _find_missing_nodes(configuring_node_names, (_get_node_names_from_status(node_status_list)))
         try:
             if invalid_state_node_dict:
                 self.logger.info("Node(s) in invalid state when configuring: {}".format(str(invalid_state_node_dict)))
@@ -277,6 +291,22 @@ class HpcClusterManager(object):
             self._set_nodes_draining(host.hostname for host in heartbeat_timeout_list)
         if running_list:
             running_node_names = [host.hostname for host in running_list]
+            node_status_list = self._hpc_client.get_node_status_exact(running_node_names)
+
+            # Unapproved nodes and missing nodes in running state are runaway nodes
+            unapproved_nodes = [_get_node_name_from_status(status) for status in node_status_list if
+                                _check_node_health_unapproved(status)]
+            missing_nodes = _find_missing_nodes(running_node_names, _get_node_names_from_status(node_status_list))
+            if unapproved_nodes:
+                self.logger.warn("Unapproved nodes in running state:{}".format(unapproved_nodes))
+                self._set_nodes_closed(unapproved_nodes)
+            if missing_nodes:
+                self.logger.warn("Missing nodes in running state:{}".format(missing_nodes))
+                self._set_nodes_closed(missing_nodes)
+
+            # Update running node names to remove closed nodes
+            running_node_names = [name for name in running_node_names if
+                                  (name not in unapproved_nodes and name not in missing_nodes)]
             idle_nodes = self._hpc_client.check_nodes_idle(running_node_names)
             self.logger.info("Get idle_nodes:{}".format(str(idle_nodes)))
             idle_timeout_nodes = self._check_node_idle_timeout([node.node_name for node in idle_nodes])
@@ -313,11 +343,12 @@ class HpcClusterManager(object):
     def start(self):
         self.start_configure_cluster_timer()
 
-    def _check_deploy_failure(self, setted_nodes):
-        # type: ([(str, HpcState)]) -> ()
-        for node, old_state in setted_nodes:
+    def _check_deploy_failure(self, set_nodes):
+        # type: (List[Tuple[str, int]]) -> ()
+        for node, old_state in set_nodes:
             if old_state == HpcState.Provisioning or old_state == HpcState.Configuring:
-                self.logger.error("Node {} failed to deploy. Previous state: {}".format(node, old_state))
+                self.logger.error(
+                    "Node {} failed to deploy. Previous state: {}".format(node, HpcState.Names[old_state]))
 
     def _set_nodes_draining(self, node_names):
         # type: (Iterable[str]) -> ()
@@ -343,7 +374,7 @@ class HpcClusterManager(object):
         self._set_node_state(node_names, HpcState.Running, "Running")
 
     def _set_node_state(self, node_names, node_state, state_name):
-        # type: (Iterable[str], HpcState, str) -> [(str, HpcState)]
+        # type: (Iterable[str], int, str) -> [(str, int)]
         set_nodes = []
         for node_name in node_names:
             u_hostname = node_name.upper()
@@ -459,4 +490,4 @@ class HpcClusterManager(object):
 
 SlaveInfo = NamedTuple("SlaveInfo",
                        [("hostname", str), ("fqdn", str), ("agent_id", str), ("task_id", str), ("cpus", float),
-                        ("last_heartbeat", datetime), ("state", HpcState)])
+                        ("last_heartbeat", datetime), ("state", int)])
