@@ -62,7 +62,8 @@ class HpcpackFramwork(object):
         framework_suffix = self.headnode.replace(',', '_')
         if self.node_group != "":
             framework_suffix = framework_suffix + '-' + self.node_group
-        self.mesos_client = MesosClient(mesos_urls=['http://172.16.1.4:5050'], frameworkName="HPC-Pack-Framework-{}".format(framework_suffix))
+        self.mesos_client = MesosClient(mesos_urls=['http://172.16.1.4:5050'],
+                                        frameworkName="HPC-Pack-Framework-{}".format(framework_suffix))
         # self.mesos_client = MesosClient(mesos_urls=['zk://127.0.0.1:2181/mesos'])
         self.mesos_client.on(MesosClient.SUBSCRIBED, self.subscribed)
         self.mesos_client.on(MesosClient.OFFERS, self.offer_received)
@@ -113,12 +114,14 @@ class HpcpackFramwork(object):
 
             if grow_decision is None:
                 cores_to_grow = 0
+                cores_in_provisioning = 0
             else:
                 cores_in_provisioning = self.heartbeat_table.get_cores_in_provisioning()
                 cores_to_grow = grow_decision.cores_to_grow - cores_in_provisioning
 
             for offer in offers:  # type: Offer
                 take_offer = False
+                cpus = 0.0
                 if cores_to_grow > 0:
                     offer_dict = offer.get_offer()
                     self.logger.info("cores_to_grow: {}, cores_in_provisioning: {}, offer_received: {}".format(
@@ -196,8 +199,8 @@ class HpcpackFramwork(object):
                 }
             ],
             'command': {'value':
-                        'powershell -File ' + self.script_path + " -setupPath " + self.setup_path +
-                        " -headnode " + self.headnode + " -sslthumbprint " + self.ssl_thumbprint + " -frameworkUri " + self.framework_uri + " > setupscript.log"}
+                            'powershell -File ' + self.script_path + " -setupPath " + self.setup_path +
+                            " -headnode " + self.headnode + " -sslthumbprint " + self.ssl_thumbprint + " -frameworkUri " + self.framework_uri + " > setupscript.log"}
         }
         self.logger.debug("Sending command:\n{}".format(task['command']['value']))
         mesos_offer.accept([task])
@@ -218,11 +221,14 @@ class HpcpackFramwork(object):
 
 if __name__ == "__main__":  # TODO: handle various kinds of input params
     from sys import argv
+
     if len(argv) == 5:
         hpcpack_framework = HpcpackFramwork(argv[0], argv[1], argv[2], argv[3], argv[4])
         hpcpack_framework.start()
     else:
-        hpcpack_framework = HpcpackFramwork("E:\\hpcsetup\\setupscript.ps1", "E:\\hpcsetup\\private.20180524.5b26f44.release.debug\\release.debug\\setup.exe",
-                                            "mesoswinjd", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "mesoswinjd", "mesossub1")
+        hpcpack_framework = HpcpackFramwork("E:\\hpcsetup\\setupscript.ps1",
+                                            "E:\\hpcsetup\\private.20180524.5b26f44.release.debug\\release.debug\\setup.exe",
+                                            "mesoswinjd", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "mesoswinjd",
+                                            "mesossub1")
 
         hpcpack_framework.start()

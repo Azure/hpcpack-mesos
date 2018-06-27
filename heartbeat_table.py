@@ -410,8 +410,8 @@ class HpcClusterManager(object):
         drained_node_names = []
         node_status_list = self._hpc_client.get_node_status_exact(node_names)
         for node_status in node_status_list:
-            node_name = node_status[HpcRestClient.NODE_STATUS_NODE_NAME_KEY]
-            node_state = node_status[HpcRestClient.NODE_STATUS_NODE_STATE_KEY]
+            node_name = _get_node_name_from_status(node_status)
+            node_state = _get_node_state_from_status(node_status)
             if _check_node_state_online(node_status):
                 take_offline_node_list.append(node_name)
             elif _check_node_state_offline(node_status):
