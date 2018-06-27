@@ -49,12 +49,10 @@ class HeartBeatHandler(BaseHTTPRequestHandler):
         self._set_headers()
 
     def do_POST(self):
-        # Doesn't do anything with posted data
-        content_length = int(self.headers['Content-Length'])  # <--- Gets the size of data
-        post_data = self.rfile.read(content_length)  # <--- Gets the data itself
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
         self._set_headers()
         json_obj = json.loads(post_data)
-        # self.wfile.write("<html><body><h1>POST!</h1><pre>" + str(json_obj) + "</pre></body></html>")
         self.logger.debug("Received heartbeat object {}".format(str(json_obj)))
         try:
             self.heartbeat_table.on_slave_heartbeat(json_obj['hostname'])
