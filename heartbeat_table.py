@@ -277,7 +277,7 @@ class HpcClusterManager(object):
             self.logger.info("Nodes configured: {}".format(configured_node_names))
             self._set_nodes_running(configured_node_names)
         if missing_nodes:
-            self.logger.info("Nodes missing in configuring: {}".format(missing_nodes))
+            self.logger.info("Nodes missing when configuring: {}".format(missing_nodes))
             self._set_nodes_closed(missing_nodes)
 
     def _check_runaway_and_idle_compute_nodes(self):
@@ -391,33 +391,19 @@ class HpcClusterManager(object):
 
     def _drain_and_stop_nodes(self):
         # type: () -> ()
-        node_names_to_drain = []
-        node_names_to_close = []
-        for host in dict(self._heart_beat_table).itervalues():
-            if host.state == HpcState.Draining:
-                node_names_to_drain.append(host.hostname)
-            elif host.state == HpcState.Closing:
-                node_names_to_close.append(host.hostname)
+        node_names_to_drain = self._get_nodes_name_in_state(HpcState.Draining)
+        node_names_to_close = self._get_nodes_name_in_state(HpcState.Closing)
 
         if node_names_to_drain:
             drained_node_names = self._drain_nodes_state_machine(node_names_to_drain)
             if drained_node_names:
-                self.logger.info("Drained nodes:{}".format(drained_node_names))
-                self._set_nodes_closing(drained_node_names)
                 node_names_to_close += drained_node_names  # short-cut the drained nodes to close
 
         if node_names_to_close:
-            closed_node_names, re_drain_node_names = self._close_node_state_machine(node_names_to_close)
-            if closed_node_names:
-                self.logger.info("Closed nodes:{}".format(closed_node_names))
-                self._set_nodes_closed(closed_node_names)
-            if re_drain_node_names:
-                self.logger.info("Closed nodes failed:{}".format(closed_node_names))
-                self._set_nodes_draining(closed_node_names)
+            self._close_node_state_machine(node_names_to_close)
 
     def _drain_nodes_state_machine(self, node_names):
         # type: (list[str]) -> list[str]
-        # TODO: check missing nodes in this state machines
         self.logger.info("Draining nodes: {}".format(node_names))
         take_offline_node_list = []
         invalid_state_node_dict = {}
@@ -432,6 +418,9 @@ class HpcClusterManager(object):
                 drained_node_names.append(node_name)
             else:
                 invalid_state_node_dict[node_name] = node_state
+
+        missing_nodes = _find_missing_nodes(node_names, _get_node_names_from_status(node_status_list))
+
         try:
             if invalid_state_node_dict:
                 self.logger.info("Node(s) in invalid state when draining: {}".format(str(invalid_state_node_dict)))
@@ -442,10 +431,17 @@ class HpcClusterManager(object):
             # Swallow all exceptions here. As we don't want any exception to prevent drained nodes to be closed
             self.logger.exception('Exception happened when draining compute node.')
 
+        if drained_node_names:
+            self.logger.info("Drained nodes:{}".format(drained_node_names))
+            self._set_nodes_closing(drained_node_names)
+        if missing_nodes:
+            self.logger.info("Missing nodes when draining:{}".format(missing_nodes))
+            self._set_nodes_closed(missing_nodes)
+
         return drained_node_names
 
     def _close_node_state_machine(self, node_names):
-        # type: (list[str]) -> (list[str], list[str])
+        # type: (list[str]) -> ()
         self.logger.info("Closing nodes: {}".format(node_names))
         to_remove_node_names = []
         re_drain_node_names = []
@@ -474,7 +470,12 @@ class HpcClusterManager(object):
             # Swallow all exceptions here. As we don't want any exception to prevent removed nodes go to closed
             self.logger.exception('Exception happened when configuring compute node.')
 
-        return closed_node, re_drain_node_names
+        if closed_node:
+            self.logger.info("Closed nodes:{}".format(closed_node))
+            self._set_nodes_closed(closed_node)
+        if re_drain_node_names:
+            self.logger.info("Closed nodes failed:{}".format(re_drain_node_names))
+            self._set_nodes_draining(re_drain_node_names)
 
     def _check_node_in_mesos_group(self, node_status):
         # type: (dict[str, any]) -> bool
