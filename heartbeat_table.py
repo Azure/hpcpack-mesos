@@ -1,7 +1,7 @@
 import threading
 from datetime import datetime, timedelta
 
-from typing import Iterable, Callable, NamedTuple, Set
+from typing import Iterable, Callable, NamedTuple, Set, Dict
 
 import logging_aux
 from restclient import HpcRestClient
@@ -58,7 +58,7 @@ class HpcClusterManager(object):
     def __init__(self, hpc_rest_client, provisioning_timeout=timedelta(minutes=15),
                  heartbeat_timeout=timedelta(minutes=3), node_group=""):
         # type: (HpcRestClient, timedelta, timedelta, str) -> ()
-        self._heart_beat_table = {}  # type: {str, SlaveInfo}
+        self._heart_beat_table = {}  # type: Dict[str, SlaveInfo]
         self._removed_nodes = set()  # type: Set[str]
         self._node_idle_check_table = {}
         self.logger = logging_aux.init_logger_aux("hpcframework.clustermanager", "hpcframework.clustermanager.log")
@@ -177,25 +177,18 @@ class HpcClusterManager(object):
         self.logger.info("Cores in provisioning: {}".format(cores))
         return cores
 
-    def _configure_compute_nodes(self):
+    def _get_nodes_name_in_state(self, state):
+        # type: (HpcState) -> [str]
+        return [host.hostname for host in dict(self._heart_beat_table).itervalues() if host.state == state]
+
+    def _configure_compute_nodes_state_machine(self):
         # type: () -> ()
-        configuring_node_names = []
-        configured_node_names = []
-        for host in dict(self._heart_beat_table).itervalues():
-            if host.state == HpcState.Configuring:
-                configuring_node_names.append(host.hostname)
-        if configuring_node_names:
-            self.logger.info("Nodes in configuring: {}".format(configuring_node_names))
-            configured_node_names = self._configure_compute_nodes_state_machine(configuring_node_names)
-        if configured_node_names:
-            self.logger.info("Nodes configured: {}".format(configured_node_names))
-            self._set_nodes_running(configured_node_names)
+        configuring_node_names = self._get_nodes_name_in_state(HpcState.Configuring)
 
-    def _configure_compute_nodes_state_machine(self, configuring_node_names):
-        # type: (Iterable[str]) -> [str]
         if not configuring_node_names:
-            return []
+            return
 
+        self.logger.info("Nodes in configuring: {}".format(configuring_node_names))
         groups = self._hpc_client.list_node_groups(self.MESOS_NODE_GROUP_NAME)
         if self.MESOS_NODE_GROUP_NAME not in groups:
             self._hpc_client.add_node_group(self.MESOS_NODE_GROUP_NAME, self.MESOS_NODE_GROUP_DESCRIPTION)
@@ -207,8 +200,9 @@ class HpcClusterManager(object):
             if self._node_group.upper() not in (x.upper() for x in target_group):
                 self.logger.error(
                     "Target node group is not created:{}. Stop configure compute nodes.".format(self._node_group))
-                return []
+                return
 
+        # state check
         node_status_list = self._hpc_client.get_node_status_exact(configuring_node_names)
         self.logger.info("Get node_status_list:{}".format(str(node_status_list)))
         unapproved_node_list = []
@@ -239,6 +233,10 @@ class HpcClusterManager(object):
                 configured_node_names.append(node_name)
             else:
                 invalid_state_node_dict[node_name] = node_state
+
+        missing_nodes = _find_missing_nodes(configuring_node_names,
+                                            (node[HpcRestClient.NODE_STATUS_NODE_NAME_KEY] for node in
+                                             node_status_list))
         try:
             if invalid_state_node_dict:
                 self.logger.info("Node(s) in invalid state when configuring: {}".format(str(invalid_state_node_dict)))
@@ -260,7 +258,13 @@ class HpcClusterManager(object):
             # Swallow all exceptions here. As we don't want any exception to prevent configured nodes to work
             self.logger.exception('Exception happened when configuring compute node.')
 
-        return configured_node_names
+        # state change
+        if configured_node_names:
+            self.logger.info("Nodes configured: {}".format(configured_node_names))
+            self._set_nodes_running(configured_node_names)
+        if missing_nodes:
+            self.logger.info("Nodes missing in configuring: {}".format(missing_nodes))
+            self._set_nodes_closed(missing_nodes)
 
     def _check_runaway_and_idle_compute_nodes(self):
         # type: () -> ()
@@ -299,7 +303,7 @@ class HpcClusterManager(object):
 
     def start_configure_cluster_timer(self):
         # type: () -> ()
-        self._configure_compute_nodes()
+        self._configure_compute_nodes_state_machine()
         self._check_runaway_and_idle_compute_nodes()
         self._drain_and_stop_nodes()
         timer = threading.Timer(self.CHECK_CONFIGURING_NODES_INTERVAL, self.start_configure_cluster_timer)
@@ -340,19 +344,19 @@ class HpcClusterManager(object):
 
     def _set_node_state(self, node_names, node_state, state_name):
         # type: (Iterable[str], HpcState, str) -> [(str, HpcState)]
-        setted_nodes = []
+        set_nodes = []
         for node_name in node_names:
             u_hostname = node_name.upper()
             if u_hostname in self._heart_beat_table:
                 if self._heart_beat_table[u_hostname].state != node_state:
                     old_state = self._heart_beat_table[u_hostname].state
                     self._heart_beat_table[u_hostname] = self._heart_beat_table[u_hostname]._replace(state=node_state)
-                    setted_nodes.append((u_hostname, old_state))
+                    set_nodes.append((u_hostname, old_state))
                     self.logger.info("Host {} set to {} from {}.".format(
                         u_hostname, state_name, HpcState.Names[old_state]))
             else:
                 self.logger.error("Host {} is not recognized. State {} Ignored.".format(u_hostname, state_name))
-        return setted_nodes
+        return set_nodes
 
     def _drain_and_stop_nodes(self):
         # type: () -> ()
