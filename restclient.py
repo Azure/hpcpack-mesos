@@ -1,16 +1,22 @@
 import json
-import logging
 from collections import namedtuple
 
 import requests
 from requests.exceptions import HTTPError
+from typing import Iterable
 
 import logging_aux
 
 GrowDecision = namedtuple("GrowDecision", "cores_to_grow nodes_to_grow sockets_to_grow")
 IdleNode = namedtuple("IdleNode", "node_name timestamp server_name")
 
+
 # TODO: change all method inputs to either all in json format or not
+
+
+def _return_json_from_res(res):
+    jobj = json.loads(res.content)
+    return jobj
 
 
 class HpcRestClient(object):
@@ -82,7 +88,7 @@ class HpcRestClient(object):
         res = requests.post(url, verify=False)
         if res.ok:
             self.logger.info(res.content)
-            grow_decision_dict = {k.upper():v for k,v in json.loads(res.content).items()}
+            grow_decision_dict = {k.upper(): v for k, v in json.loads(res.content).items()}
             if node_group_name == "":
                 jobj = grow_decision_dict[self.DEFAULT_NODEGROUP_TOKEN]
             elif node_group_name.upper() in grow_decision_dict:
@@ -103,12 +109,12 @@ class HpcRestClient(object):
     def bring_nodes_online(self, nodes):
         data = json.dumps(nodes)
         res = self._post(self.bring_nodes_online.__name__, self.BRING_NODES_ONLINE_ROUTE, data)
-        return self._return_json_from_res(res)
+        return _return_json_from_res(res)
 
     def take_nodes_offline(self, nodes):
         data = json.dumps(nodes)
         res = self._post(self.take_nodes_offline.__name__, self.TAKE_NODES_OFFLINE_ROUTE, data)
-        return self._return_json_from_res(res)
+        return _return_json_from_res(res)
 
     def assign_default_compute_node_template(self, nodename_arr):
         return self.assign_nodes_template(nodename_arr, self.DEFAULT_COMPUTENODE_TEMPLATE)
@@ -116,18 +122,18 @@ class HpcRestClient(object):
     def assign_nodes_template(self, nodename_arr, template_name):
         params = json.dumps({"nodeNames": nodename_arr, "templateName": template_name})
         res = self._post(self.assign_nodes_template.__name__, self.ASSIGN_NODES_TEMPLATE_ROUTE, params)
-        return self._return_json_from_res(res)
+        return _return_json_from_res(res)
 
     def remove_nodes(self, nodes):
         data = json.dumps(nodes)
         res = self._post(self.remove_nodes.__name__, self.REMOVE_NODES_ROUTE, data)
-        return self._return_json_from_res(res)
+        return _return_json_from_res(res)
 
     def get_node_status_exact(self, node_names):
-        # type: (list[str]) -> list[dict[str, any]]
+        # type: (Iterable[str]) -> list[dict[str, any]]
         params = json.dumps({"nodeNames": node_names})
         res = self._post(self.get_node_status_exact.__name__, self.NODE_STATUS_EXACT_ROUTE, params)
-        return self._return_json_from_res(res)
+        return _return_json_from_res(res)
 
     # Starts node group api
     def list_node_groups(self, group_name=""):
@@ -135,21 +141,17 @@ class HpcRestClient(object):
         if group_name != "":
             params['nodeGroupName'] = group_name
         res = self._get(self.list_node_groups.__name__, self.LIST_NODE_GROUPS_ROUTE, params)
-        return self._return_json_from_res(res)
+        return _return_json_from_res(res)
 
     def add_node_group(self, group_name, group_description=""):
         params = json.dumps({"name": group_name, "description": group_description})
         res = self._post(self.add_node_group.__name__, self.ADD_NEW_GROUP_ROUTE, params)
-        return self._return_json_from_res(res)
+        return _return_json_from_res(res)
 
     def add_node_to_node_group(self, group_name, node_names):
         res = self._post(self.add_node_to_node_group.__name__, self.ADD_NODES_TO_NODE_GROUP_ROUTE.format(
             group_name=group_name), json.dumps(node_names))
-        return self._return_json_from_res(res)
-
-    def _return_json_from_res(self, res):
-        jobj = json.loads(res.content)
-        return jobj
+        return _return_json_from_res(res)
 
 
 if __name__ == '__main__':
