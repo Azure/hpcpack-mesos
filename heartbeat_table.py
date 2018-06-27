@@ -2,7 +2,7 @@ import threading
 from collections import namedtuple
 from datetime import datetime, timedelta
 
-from typing import Iterable, Callable
+from typing import Iterable, Callable, NamedTuple
 
 import logging_aux
 from restclient import HpcRestClient
@@ -35,9 +35,11 @@ class HpcClusterManager(object):
         self._node_closed_callbacks = []  # type: list[Callable[[list[str]], ()]]
 
     def __get_hostname_from_fqdn(self, fqdn):
+        # type: (str) -> str
         return fqdn.split('.')[0]
 
     def _node_group_specified(self):
+        # type: () -> bool
         return self._node_group != ""
 
     def subscribe_node_closed_callback(self, callback):
@@ -45,6 +47,7 @@ class HpcClusterManager(object):
         self._node_closed_callbacks.append(callback)
 
     def add_slaveinfo(self, fqdn, agent_id, task_id, cpus, last_heartbeat=datetime.utcnow()):
+        # type: (str, str, str, float, datetime) -> ()
         u_fqdn = fqdn.upper()
         hostname = self.__get_hostname_from_fqdn(u_fqdn)
         if hostname in self._heart_beat_table:
@@ -77,6 +80,7 @@ class HpcClusterManager(object):
             self.logger.debug("_table {} ".format(self._heart_beat_table))
 
     def get_task_info(self, hostname):
+        # type: (str) -> (str, str)
         u_hostname = hostname.upper()
         if u_hostname in self._heart_beat_table:
             entry = self._heart_beat_table[u_hostname]
@@ -86,6 +90,7 @@ class HpcClusterManager(object):
             return "", ""
 
     def get_host_state(self, hostname):
+        # type: (str) -> HpcState
         u_hostname = hostname.upper()
         if u_hostname in self._heart_beat_table:
             entry = self._heart_beat_table[u_hostname]
@@ -103,6 +108,7 @@ class HpcClusterManager(object):
                 self.logger.exception('Error in %s callback: %s' % (callback.__name__, str(e)))
 
     def check_fqdn_collision(self, fqdn):
+        # type: (str) -> bool
         u_fqdn = fqdn.upper()
         hostname = self.__get_hostname_from_fqdn(u_fqdn)
         if hostname in self._heart_beat_table:
@@ -111,6 +117,7 @@ class HpcClusterManager(object):
         return False
 
     def check_timeout(self, now=datetime.utcnow()):
+        # type: (datetime) -> ([str], [str], [str])
         provision_timeout_list = []
         heartbeat_timeout_list = []
         running_list = []
@@ -124,7 +131,7 @@ class HpcClusterManager(object):
                     heartbeat_timeout_list.append(host)
                 else:
                     running_list.append(host)
-        return (provision_timeout_list, heartbeat_timeout_list, running_list)
+        return provision_timeout_list, heartbeat_timeout_list, running_list
 
     def get_cores_in_provisioning(self):
         cores = 0.0
@@ -135,6 +142,7 @@ class HpcClusterManager(object):
         return cores
 
     def _configure_compute_nodes(self):
+        # type: () -> ()
         configuring_node_names = []
         configured_node_names = []
         for host in dict(self._heart_beat_table).itervalues():
@@ -148,6 +156,7 @@ class HpcClusterManager(object):
             self._set_nodes_running(configured_node_names)
 
     def _configure_compute_nodes_state_machine(self, configuring_node_names):
+        # type: (Iterable[str]) -> [str]
         if not configuring_node_names:
             return []
 
@@ -218,6 +227,7 @@ class HpcClusterManager(object):
         return configured_node_names
 
     def _check_runaway_and_idle_compute_nodes(self):
+        # type: () -> ()
         (provision_timeout_list, heartbeat_timeout_list, running_list) = self.check_timeout()
         if provision_timeout_list:
             self.logger.info("Get provision_timeout_list:{}".format(str(provision_timeout_list)))
@@ -234,6 +244,7 @@ class HpcClusterManager(object):
             self._set_nodes_draining(idle_timeout_nodes)
 
     def _check_node_idle_timeout(self, node_names):
+        # type: (Iterable[str]) -> [str]
         new_node_idle_check_table = {}
         for u_node_name in self._upper_strings(node_names):
             if u_node_name in self._node_idle_check_table:
@@ -251,6 +262,7 @@ class HpcClusterManager(object):
                 (now - value) > self._node_idle_timedelta]
 
     def start_configure_cluster_timer(self):
+        # type: () -> ()
         self._configure_compute_nodes()
         self._check_runaway_and_idle_compute_nodes()
         self._drain_and_stop_nodes()
@@ -300,6 +312,7 @@ class HpcClusterManager(object):
         return setted_nodes
 
     def _drain_and_stop_nodes(self):
+        # type: () -> ()
         node_names_to_drain = []
         node_names_to_close = []
         for host in dict(self._heart_beat_table).itervalues():
@@ -416,9 +429,12 @@ class HpcClusterManager(object):
         # type: (dict[str, any]) -> bool
         return self._check_node_state(node_status, HpcRestClient.NODE_STATUS_NODE_STATE_ONLINE_VALUE)
 
-SlaveInfo = namedtuple("SlaveInfo", "hostname fqdn agent_id task_id cpus last_heartbeat state")
-
 
 class HpcState:
     Unknown, Provisioning, Configuring, Running, Draining, Closing, Closed = range(7)
     Names = ["Unknown", "Provisioning", "Configuring", "Running", "Draining", "Closing", "Closed"]
+
+
+SlaveInfo = NamedTuple("SlaveInfo",
+                       [("hostname", str), ("fqdn", str), ("agent_id", str), ("task_id", str), ("cpus", float),
+                        ("last_heartbeat", datetime), ("state", HpcState)])
