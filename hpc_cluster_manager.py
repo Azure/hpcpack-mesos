@@ -72,8 +72,8 @@ class HpcClusterManager(object):
 
     # TODO: add configuration_timeout
     def __init__(self, hpc_rest_client, provisioning_timeout=timedelta(minutes=15),
-                 heartbeat_timeout=timedelta(minutes=3), node_group=""):
-        # type: (HpcRestClient, timedelta, timedelta, str) -> ()
+                 heartbeat_timeout=timedelta(minutes=3), idle_timeout=timedelta(minutes=3), node_group=""):
+        # type: (HpcRestClient, timedelta, timedelta, timedelta, str) -> ()
         self._heart_beat_table = {}  # type: Dict[str, SlaveInfo]
         self._removed_nodes = set()  # type: Set[str]
         self._node_idle_check_table = {}
@@ -84,7 +84,7 @@ class HpcClusterManager(object):
         self._hpc_client = hpc_rest_client
         self._node_group = node_group  # TODO: change to a centralized config
 
-        self._node_idle_timedelta = timedelta(0, self.NODE_IDLE_TIMEOUT)
+        self._node_idle_timedelta = idle_timeout
 
         # callbacks
         self._node_closed_callbacks = []  # type: [Callable[[[str]], ()]]
@@ -167,8 +167,8 @@ class HpcClusterManager(object):
                 return True
         return False
 
-    def check_timeout(self, now=datetime.utcnow()):
-        # type: (datetime) -> ([str], [str], [str])
+    def _check_timeout(self, now=datetime.utcnow()):
+        # type: (datetime) -> ([SlaveInfo], [SlaveInfo], [SlaveInfo])
         # TODO: Check configuring timeout
         provision_timeout_list = []
         heartbeat_timeout_list = []
@@ -282,7 +282,7 @@ class HpcClusterManager(object):
 
     def _check_runaway_and_idle_compute_nodes(self):
         # type: () -> ()
-        (provision_timeout_list, heartbeat_timeout_list, running_list) = self.check_timeout()
+        (provision_timeout_list, heartbeat_timeout_list, running_list) = self._check_timeout()
         if provision_timeout_list:
             self.logger.info("Get provision_timeout_list:{}".format(str(provision_timeout_list)))
             self._set_nodes_draining(host.hostname for host in provision_timeout_list)
@@ -313,35 +313,34 @@ class HpcClusterManager(object):
             self.logger.info("Get idle_timeout_nodes:{}".format(str(idle_timeout_nodes)))
             self._set_nodes_draining(idle_timeout_nodes)
 
-    def _check_node_idle_timeout(self, node_names):
-        # type: (Iterable[str]) -> [str]
+    def _check_node_idle_timeout(self, node_names, now=datetime.utcnow()):
+        # type: (Iterable[str], datetime) -> [str]
         new_node_idle_check_table = {}
         for u_node_name in _upper_strings(node_names):
             if u_node_name in self._node_idle_check_table:
                 if u_node_name in self._removed_nodes:
-                    new_node_idle_check_table[u_node_name] = datetime.now()
+                    new_node_idle_check_table[u_node_name] = now
                     self._removed_nodes.discard(u_node_name)
                 else:
                     new_node_idle_check_table[u_node_name] = self._node_idle_check_table[u_node_name]
             else:
-                new_node_idle_check_table[u_node_name] = datetime.now()
+                new_node_idle_check_table[u_node_name] = now
         self._node_idle_check_table = new_node_idle_check_table
-        now = datetime.now()
         self.logger.info("_check_node_idle_timeout: " + str(self._node_idle_check_table))
         return [name for name, value in self._node_idle_check_table.iteritems() if
-                (now - value) > self._node_idle_timedelta]
+                (now - value) >= self._node_idle_timedelta]
 
-    def start_configure_cluster_timer(self):
+    def _start_configure_cluster_timer(self):
         # type: () -> ()
         self._configure_compute_nodes_state_machine()
         self._check_runaway_and_idle_compute_nodes()
         self._drain_and_stop_nodes()
-        timer = threading.Timer(self.CHECK_CONFIGURING_NODES_INTERVAL, self.start_configure_cluster_timer)
+        timer = threading.Timer(self.CHECK_CONFIGURING_NODES_INTERVAL, self._start_configure_cluster_timer)
         timer.daemon = True
         timer.start()
 
     def start(self):
-        self.start_configure_cluster_timer()
+        self._start_configure_cluster_timer()
 
     def _check_deploy_failure(self, set_nodes):
         # type: (List[Tuple[str, int]]) -> ()
