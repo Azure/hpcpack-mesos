@@ -1,7 +1,7 @@
 import datetime
 import unittest
 
-from heartbeat_table import HpcClusterManager, HpcState
+from hpc_cluster_manager import HpcClusterManager, HpcState
 from mock import patch
 
 HOST1HOSTNAME = "host1hostname"

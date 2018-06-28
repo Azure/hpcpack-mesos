@@ -7,7 +7,7 @@ import uuid
 from mesoshttp.client import MesosClient
 from mesoshttp.offers import Offer
 
-import heartbeat_table
+import hpc_cluster_manager
 import logging_aux
 import restserver
 from restclient import HpcRestClient
@@ -53,7 +53,7 @@ class HpcpackFramwork(object):
         self.framework_uri = framework_uri
         self.node_group = node_group
         self.hpc_client = HpcRestClient()
-        self.heartbeat_table = heartbeat_table.HpcClusterManager(self.hpc_client, node_group=self.node_group)
+        self.heartbeat_table = hpc_cluster_manager.HpcClusterManager(self.hpc_client, node_group=self.node_group)
         self.heartbeat_table.subscribe_node_closed_callback(lambda l: map(self._kill_task_by_hostname, l))
         self.heartbeat_table.start()
         self.core_provisioning = 0.0
