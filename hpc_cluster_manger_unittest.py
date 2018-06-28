@@ -43,97 +43,97 @@ class HeartbeatTableUnitTest(unittest.TestCase):
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
     def test_fqdn_add_slaveinfo(self, mock_restc):
-        heartbeat_table = HpcClusterManager(mock_restc)
-        heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
-        (task_id, agent_id) = heartbeat_table.get_task_info(HOST1HOSTNAME)
+        clusmgr = HpcClusterManager(mock_restc)
+        clusmgr.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
+        (task_id, agent_id) = clusmgr.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
         self.assertEquals(agent_id, HOST1AGENTID)
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
     def test_hostname_add_slaveinfo(self, mock_restc):
-        heartbeat_table = HpcClusterManager(mock_restc)
-        heartbeat_table.add_slaveinfo(HOST1HOSTNAME, HOST1AGENTID, HOST1TASKID1, 1)
-        (task_id, agent_id) = heartbeat_table.get_task_info(HOST1HOSTNAME)
+        clusmgr = HpcClusterManager(mock_restc)
+        clusmgr.add_slaveinfo(HOST1HOSTNAME, HOST1AGENTID, HOST1TASKID1, 1)
+        (task_id, agent_id) = clusmgr.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
         self.assertEquals(agent_id, HOST1AGENTID)
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
     def test_duplicated_add_slaveinfo(self, mock_restc):
-        heartbeat_table = HpcClusterManager(mock_restc)
-        heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 2)
-        (task_id, _) = heartbeat_table.get_task_info(HOST1HOSTNAME)
+        clusmgr = HpcClusterManager(mock_restc)
+        clusmgr.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 2)
+        (task_id, _) = clusmgr.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
-        heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID2, 3)
-        (task_id, _) = heartbeat_table.get_task_info(HOST1HOSTNAME)
+        clusmgr.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID2, 3)
+        (task_id, _) = clusmgr.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID2)
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
     def test_same_hostname_add_slaveinfo(self, mock_restc):
-        heartbeat_table = HpcClusterManager(mock_restc)
-        heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 2)
-        (task_id, _) = heartbeat_table.get_task_info(HOST1HOSTNAME)
+        clusmgr = HpcClusterManager(mock_restc)
+        clusmgr.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 2)
+        (task_id, _) = clusmgr.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
-        heartbeat_table.add_slaveinfo(HOST1FQDN2, HOST1AGENTID, HOST1TASKID2, 3)
-        (task_id, _) = heartbeat_table.get_task_info(HOST1HOSTNAME)
+        clusmgr.add_slaveinfo(HOST1FQDN2, HOST1AGENTID, HOST1TASKID2, 3)
+        (task_id, _) = clusmgr.get_task_info(HOST1HOSTNAME)
         self.assertEquals(task_id, HOST1TASKID1)
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
     def test_host_state_change(self, mock_restc):
-        heartbeat_table = HpcClusterManager(mock_restc)
-        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Unknown)
-        heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
-        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Provisioning)
-        heartbeat_table.on_slave_heartbeat(HOST1HOSTNAME)
-        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Configuring)
-        heartbeat_table.on_slave_heartbeat(HOST1HOSTNAME)
-        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Configuring)
-        heartbeat_table._set_nodes_running([HOST1HOSTNAME])
-        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Running)
-        heartbeat_table._set_nodes_draining([HOST1HOSTNAME])
-        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Draining)
-        heartbeat_table._set_nodes_closing([HOST1HOSTNAME])
-        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Closing)
-        heartbeat_table._set_nodes_closed([HOST1HOSTNAME])
-        self.assertEquals(heartbeat_table.get_host_state(HOST1HOSTNAME), HpcState.Closed)
+        clusmgr = HpcClusterManager(mock_restc)
+        self.assertEquals(clusmgr.get_host_state(HOST1HOSTNAME), HpcState.Unknown)
+        clusmgr.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
+        self.assertEquals(clusmgr.get_host_state(HOST1HOSTNAME), HpcState.Provisioning)
+        clusmgr.on_slave_heartbeat(HOST1HOSTNAME)
+        self.assertEquals(clusmgr.get_host_state(HOST1HOSTNAME), HpcState.Configuring)
+        clusmgr.on_slave_heartbeat(HOST1HOSTNAME)
+        self.assertEquals(clusmgr.get_host_state(HOST1HOSTNAME), HpcState.Configuring)
+        clusmgr._set_nodes_running([HOST1HOSTNAME])
+        self.assertEquals(clusmgr.get_host_state(HOST1HOSTNAME), HpcState.Running)
+        clusmgr._set_nodes_draining([HOST1HOSTNAME])
+        self.assertEquals(clusmgr.get_host_state(HOST1HOSTNAME), HpcState.Draining)
+        clusmgr._set_nodes_closing([HOST1HOSTNAME])
+        self.assertEquals(clusmgr.get_host_state(HOST1HOSTNAME), HpcState.Closing)
+        clusmgr._set_nodes_closed([HOST1HOSTNAME])
+        self.assertEquals(clusmgr.get_host_state(HOST1HOSTNAME), HpcState.Closed)
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
     def test_check_timeout(self, mock_restc):
-        heartbeat_table = HpcClusterManager(mock_restc, TENMINUTES, TENMINUTES)
-        heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1, UTCNOW)
+        clusmgr = HpcClusterManager(mock_restc, TENMINUTES, TENMINUTES)
+        clusmgr.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1, UTCNOW)
         # Provisioning state
-        (provision_timeout_list, heartbeat_timeout_list, running_list) = heartbeat_table._check_timeout(
+        (provision_timeout_list, heartbeat_timeout_list, running_list) = clusmgr._check_timeout(
             UTCNOW + TENMINUTES - ONESEC)
         self.assertFalse(provision_timeout_list)
         self.assertFalse(heartbeat_timeout_list)
         self.assertFalse(running_list)
-        (provision_timeout_list, heartbeat_timeout_list, running_list) = heartbeat_table._check_timeout(
+        (provision_timeout_list, heartbeat_timeout_list, running_list) = clusmgr._check_timeout(
             UTCNOW + TENMINUTES)
         self.assertEqual(provision_timeout_list[0].hostname, HOST1HOSTNAME.upper())
         self.assertFalse(heartbeat_timeout_list)
         self.assertFalse(running_list)
         # Heart beat will lead into Configuring state
-        heartbeat_table.on_slave_heartbeat(HOST1HOSTNAME, UTCNOW)
+        clusmgr.on_slave_heartbeat(HOST1HOSTNAME, UTCNOW)
         # TODO: Add and test configuring timeout
         # Running state
-        heartbeat_table._set_nodes_running([HOST1HOSTNAME])
-        (provision_timeout_list, heartbeat_timeout_list, running_list) = heartbeat_table._check_timeout(
+        clusmgr._set_nodes_running([HOST1HOSTNAME])
+        (provision_timeout_list, heartbeat_timeout_list, running_list) = clusmgr._check_timeout(
             UTCNOW + TENMINUTES - ONESEC)
         self.assertFalse(provision_timeout_list)
         self.assertFalse(heartbeat_timeout_list)
         self.assertEqual(running_list[0].hostname, HOST1HOSTNAME.upper())
-        (provision_timeout_list, heartbeat_timeout_list, running_list) = heartbeat_table._check_timeout(
+        (provision_timeout_list, heartbeat_timeout_list, running_list) = clusmgr._check_timeout(
             UTCNOW + TENMINUTES)
         self.assertFalse(provision_timeout_list)
         self.assertEqual(heartbeat_timeout_list[0].hostname, HOST1HOSTNAME.upper())
         self.assertFalse(running_list)
         # Close state
-        heartbeat_table._set_nodes_closed([HOST1HOSTNAME])
-        (provision_timeout_list, heartbeat_timeout_list, running_list) = heartbeat_table._check_timeout(
+        clusmgr._set_nodes_closed([HOST1HOSTNAME])
+        (provision_timeout_list, heartbeat_timeout_list, running_list) = clusmgr._check_timeout(
             UTCNOW + TENMINUTES - ONESEC)
         self.assertFalse(provision_timeout_list)
         self.assertFalse(heartbeat_timeout_list)
         self.assertFalse(running_list)
-        (provision_timeout_list, heartbeat_timeout_list, running_list) = heartbeat_table._check_timeout(
+        (provision_timeout_list, heartbeat_timeout_list, running_list) = clusmgr._check_timeout(
             UTCNOW + TENMINUTES)
         self.assertFalse(provision_timeout_list)
         self.assertFalse(heartbeat_timeout_list)
@@ -141,33 +141,33 @@ class HeartbeatTableUnitTest(unittest.TestCase):
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
     def test_get_cores_in_provisioning(self, mock_restc):
-        heartbeat_table = HpcClusterManager(mock_restc)
-        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 0)
+        clusmgr = HpcClusterManager(mock_restc)
+        self.assertEqual(clusmgr.get_cores_in_provisioning(), 0)
         # Add 1 core
-        heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
-        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 1)
+        clusmgr.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
+        self.assertEqual(clusmgr.get_cores_in_provisioning(), 1)
         # Add 2 cores
-        heartbeat_table.add_slaveinfo(HOST2FQDN, HOST2AGENTID, HOST2TASKID1, 2)
-        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 3)
+        clusmgr.add_slaveinfo(HOST2FQDN, HOST2AGENTID, HOST2TASKID1, 2)
+        self.assertEqual(clusmgr.get_cores_in_provisioning(), 3)
         # Get 2 cores to configuring
-        heartbeat_table.on_slave_heartbeat(HOST2HOSTNAME)
-        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 3)
+        clusmgr.on_slave_heartbeat(HOST2HOSTNAME)
+        self.assertEqual(clusmgr.get_cores_in_provisioning(), 3)
         # Get same 2 cores to configuring
-        heartbeat_table.on_slave_heartbeat(HOST2HOSTNAME)
-        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 3)
+        clusmgr.on_slave_heartbeat(HOST2HOSTNAME)
+        self.assertEqual(clusmgr.get_cores_in_provisioning(), 3)
         # Get 1 core to running
-        heartbeat_table._set_nodes_running([HOST1HOSTNAME])
-        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 2)
+        clusmgr._set_nodes_running([HOST1HOSTNAME])
+        self.assertEqual(clusmgr.get_cores_in_provisioning(), 2)
         # Get 1 core to closed
-        heartbeat_table._set_nodes_closed([HOST1HOSTNAME])
-        self.assertEqual(heartbeat_table.get_cores_in_provisioning(), 2)
+        clusmgr._set_nodes_closed([HOST1HOSTNAME])
+        self.assertEqual(clusmgr.get_cores_in_provisioning(), 2)
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
     def test_check_fqdn_collision(self, mock_restc):
-        heartbeat_table = HpcClusterManager(mock_restc)
-        heartbeat_table.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
-        self.assertTrue(heartbeat_table.check_fqdn_collision(HOST1FQDN2))
-        self.assertFalse(heartbeat_table.check_fqdn_collision(HOST1FQDN))
+        clusmgr = HpcClusterManager(mock_restc)
+        clusmgr.add_slaveinfo(HOST1FQDN, HOST1AGENTID, HOST1TASKID1, 1)
+        self.assertTrue(clusmgr.check_fqdn_collision(HOST1FQDN2))
+        self.assertFalse(clusmgr.check_fqdn_collision(HOST1FQDN))
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
     def test_check_node_idle_not_idle(self, mock_restc):
