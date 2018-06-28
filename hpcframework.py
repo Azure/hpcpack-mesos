@@ -187,7 +187,8 @@ class HpcpackFramwork(object):
             ],
             'command': {'value':
                             'powershell -File ' + self.script_path + " -setupPath " + self.setup_path +
-                            " -headnode " + self.headnode + " -sslthumbprint " + self.ssl_thumbprint + " -frameworkUri " + self.framework_uri + " > setupscript.log"}
+                            " -headnode " + self.headnode + " -sslthumbprint " + self.ssl_thumbprint +
+                            " -frameworkUri " + self.framework_uri + " > setupscript.log"}
         }
         self.logger.debug("Sending command:\n{}".format(task['command']['value']))
         offer.accept([task])
@@ -206,16 +207,29 @@ class HpcpackFramwork(object):
             self.logger.warn("Task info for host {} not found".format(hostname))
 
 
-if __name__ == "__main__":  # TODO: handle various kinds of input params
-    from sys import argv
+if __name__ == "__main__":  # TODO: heartbeat_uri can be optional parameter
+    import argparse
 
-    if len(argv) == 5:
-        hpcpack_framework = HpcpackFramwork(argv[0], argv[1], argv[2], argv[3], argv[4])
-        hpcpack_framework.start()
-    else:
-        hpcpack_framework = HpcpackFramwork("E:\\hpcsetup\\setupscript.ps1",
-                                            "E:\\hpcsetup\\private.20180524.5b26f44.release.debug\\release.debug\\setup.exe",
-                                            "mesoswinjd", "0386B1198B956BBAAA4154153B6CA1F44B6D1016", "mesoswinjd",
-                                            "mesossub1")
+    parser = argparse.ArgumentParser(description="HPC Pack Mesos framework")
+    parser.add_argument("-g", "--node_group", default="")
+    parser.add_argument("script_path", help="Path of HPC Pack Mesos slave setup script (e.g. setupscript.ps1)")
+    parser.add_argument("setup_path", help="Path of HPC Pack setup executable (e.g. setup.exe)")
+    parser.add_argument("headnode", help="Hostname of HPC Pack cluster head node")
+    parser.add_argument("ssl_thumbprint",
+                        help="Thumbprint of certificate which will be used in installtion and communication with HPC "
+                             "Pack cluster")
+    parser.add_argument("heartbeat_uri", help="Base URI of heart beat server of HPC Pack Mesos framework")
+    args = parser.parse_args()
 
-        hpcpack_framework.start()
+    print "Input arguments:"
+    print "script_path: " + args.script_path
+    print "setup_path: " + args.setup_path
+    print "headnode: " + args.headnode
+    print "ssl_thumbprint: " + args.ssl_thumbprint
+    print "heartbeat_uri: " + args.heartbeat_uri
+    if args.node_group != "":
+        print "node_group: " + args.node_group
+
+    hpcpack_framework = HpcpackFramwork(args.script_path, args.setup_path, args.headnode, args.heartbeat_uri,
+                                        args.node_group)
+    hpcpack_framework.start()
