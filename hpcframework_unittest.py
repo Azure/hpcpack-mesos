@@ -1,8 +1,10 @@
-import unittest
-import hpcframework
-from mesoshttp.offers import Offer
 import json
-from mock import mock, patch, MagicMock, call
+import unittest
+
+from mesoshttp.offers import Offer
+from mock import patch, MagicMock, call
+
+import hpcframework
 
 
 def create_mock_mesos_offer_aux(cpus, max_cores, is_windows, hostname):
@@ -11,7 +13,7 @@ def create_mock_mesos_offer_aux(cpus, max_cores, is_windows, hostname):
         "hostname": "{}",
         "attributes": [
     '''.format(hostname)
-    if(is_windows):
+    if (is_windows):
         json_offer += '''
         {
             "text": {
@@ -92,11 +94,12 @@ class HpcFrameworkUnitTest(unittest.TestCase):
         mock_accept_offer.assert_has_calls(calls)
         mock_decline_offer.assert_called_with(offer3)
 
-    @patch('heartbeat_table.HpcClusterManager.get_cores_in_provisioning')
+    @patch('hpc_cluster_manager.HpcClusterManager.get_cores_in_provisioning')
     @patch('hpcframework.HpcpackFramwork.decline_offer')
     @patch('hpcframework.HpcpackFramwork.accept_offer')
     @patch('restclient.HpcRestClient.get_grow_decision')
-    def test_accept_offer_with_provisioning(self, mock_get_grow_decision, mock_accept_offer, mock_decline_offer, mock_get_cores_in_provisioning):
+    def test_accept_offer_with_provisioning(self, mock_get_grow_decision, mock_accept_offer, mock_decline_offer,
+                                            mock_get_cores_in_provisioning):
         mock_get_grow_decision.return_value = MagicMock(cores_to_grow=5)
         mock_get_cores_in_provisioning.return_value = 1
         offer1 = create_mock_mesos_offer(1.0, 1.0, True, "host1")
@@ -108,11 +111,12 @@ class HpcFrameworkUnitTest(unittest.TestCase):
         mock_accept_offer.assert_has_calls(calls)
         mock_decline_offer.assert_not_called()
 
-    @patch('heartbeat_table.HpcClusterManager.get_cores_in_provisioning')
+    @patch('hpc_cluster_manager.HpcClusterManager.get_cores_in_provisioning')
     @patch('hpcframework.HpcpackFramwork.decline_offer')
     @patch('hpcframework.HpcpackFramwork.accept_offer')
     @patch('restclient.HpcRestClient.get_grow_decision')
-    def test_accept_partial_offer_with_provisioning(self, mock_get_grow_decision, mock_accept_offer, mock_decline_offer, mock_get_cores_in_provisioning):
+    def test_accept_partial_offer_with_provisioning(self, mock_get_grow_decision, mock_accept_offer, mock_decline_offer,
+                                                    mock_get_cores_in_provisioning):
         mock_get_grow_decision.return_value = MagicMock(cores_to_grow=2)
         mock_get_cores_in_provisioning.return_value = 1
         offer1 = create_mock_mesos_offer(1.0, 1.0, True, "host1")
@@ -124,12 +128,13 @@ class HpcFrameworkUnitTest(unittest.TestCase):
         mock_accept_offer.assert_called_with(offer1)
         mock_decline_offer.assert_has_calls(calls)
 
-    @patch('heartbeat_table.HpcClusterManager.check_fqdn_collision')
-    @patch('heartbeat_table.HpcClusterManager.get_cores_in_provisioning')
+    @patch('hpc_cluster_manager.HpcClusterManager.check_fqdn_collision')
+    @patch('hpc_cluster_manager.HpcClusterManager.get_cores_in_provisioning')
     @patch('hpcframework.HpcpackFramwork.decline_offer')
     @patch('hpcframework.HpcpackFramwork.accept_offer')
     @patch('restclient.HpcRestClient.get_grow_decision')
-    def test_declient_offer_on_fqdn_collision(self, mock_get_grow_decision, mock_accept_offer, mock_decline_offer, mock_get_cores_in_provisioning, mock_check_fqdn_collision):
+    def test_declient_offer_on_fqdn_collision(self, mock_get_grow_decision, mock_accept_offer, mock_decline_offer,
+                                              mock_get_cores_in_provisioning, mock_check_fqdn_collision):
         mock_get_grow_decision.return_value = MagicMock(cores_to_grow=2)
         mock_get_cores_in_provisioning.return_value = 0
         mock_check_fqdn_collision.return_value = True
@@ -149,6 +154,7 @@ class HpcFrameworkUnitTest(unittest.TestCase):
         self.hpcpackFramework.offer_received(offers)
         mock_accept_offer.assert_not_called()
         mock_decline_offer.assert_called_with(offer)
+
 
 if __name__ == '__main__':
     unittest.main()
