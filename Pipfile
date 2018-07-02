@@ -6,6 +6,7 @@ name = "pypi"
 [dev-packages]
 nose = "*"
 mock = "*"
+coverage = "*"
 
 [packages]
 requests = "*"
