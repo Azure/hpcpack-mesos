@@ -1,9 +1,10 @@
 import datetime
 import unittest
 
-from mock import patch
+from mock import patch, MagicMock
 
 from hpc_cluster_manager import HpcClusterManager, HpcState
+from restclient import HpcRestClient
 
 HOST1HOSTNAME = "host1hostname"
 HOST1FQDN = "host1hostname.fqdn.com"
@@ -16,6 +17,8 @@ HOST2HOSTNAME = "host2hostname"
 HOST2FQDN = "host2hostname.fqdn.com"
 HOST2AGENTID = "host2agentid"
 HOST2TASKID1 = "host2taskid1"
+
+HOST3HOSTNAME = "host3hostname"
 
 ZERODELTA = datetime.timedelta(0)
 
@@ -35,6 +38,15 @@ utc = UTCtzinfo()
 UTCNOW = datetime.datetime(2018, 1, 1, 12, 0, 0, 0, tzinfo=utc)
 TENMINUTES = datetime.timedelta(minutes=10)
 ONESEC = datetime.timedelta(seconds=1)
+
+
+def _set_node_name(node_status, name):
+    node_status[HpcRestClient.NODE_STATUS_NODE_NAME_KEY] = name
+
+
+_true_mock_result = MagicMock(return_value=True)
+_false_mock_result = MagicMock(return_value=False)
+_empty_mock_result = MagicMock(return_value="")
 
 
 class HeartbeatTableUnitTest(unittest.TestCase):
@@ -227,6 +239,17 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         clusmgr._set_nodes_running([HOST1HOSTNAME])
         _, res, _ = clusmgr._check_timeout(UTCNOW + TENMINUTES)
         self.assertTrue(res)
+
+    @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
+    def test_invalid_heartbeat(self, mock_restc):
+        clusmgr = HpcClusterManager(mock_restc)
+        clusmgr.on_slave_heartbeat(HOST1HOSTNAME)
+        self.assertFalse(clusmgr._heart_beat_table)
+
+    @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
+    def test_missing_task_info(self, mock_restc):
+        clusmgr = HpcClusterManager(mock_restc)
+        self.assertEqual(clusmgr.get_task_info(HOST1HOSTNAME), ("", ""))
 
 
 if __name__ == '__main__':

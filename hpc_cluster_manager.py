@@ -123,9 +123,7 @@ class HpcClusterManager(object):
             if self._heart_beat_table[u_hostname].state == HpcState.Provisioning:
                 with self._table_lock:
                     if self._heart_beat_table[u_hostname].state == HpcState.Provisioning:
-                        self._heart_beat_table[u_hostname] = self._heart_beat_table[u_hostname]._replace(
-                            state=HpcState.Configuring)
-                        self.logger.info("Configuring Host {}".format(u_hostname))
+                        self._set_nodes_configuring(u_hostname)
         else:
             self.logger.error("Host {} is not recognized. Heartbeat ignored.".format(u_hostname))
             self.logger.debug("_table {} ".format(self._heart_beat_table))
@@ -197,6 +195,7 @@ class HpcClusterManager(object):
         # type: (HpcState) -> [str]
         return [host.hostname for host in dict(self._heart_beat_table).itervalues() if host.state == state]
 
+    # TODO:  make state_machine methods more testable
     def _configure_compute_nodes_state_machine(self):
         # type: () -> ()
         configuring_node_names = self._get_nodes_name_in_state(HpcState.Configuring)
@@ -229,11 +228,11 @@ class HpcClusterManager(object):
         invalid_state_node_dict = {}
         for node_status in node_status_list:
             node_name = _get_node_name_from_status(node_status)
-            node_state = node_status[HpcRestClient.NODE_STATUS_NODE_STATE_KEY]
+            node_state = _get_node_state_from_status(node_status)
             if _check_node_health_unapproved(node_status):
                 unapproved_node_list.append(node_name)
             # node approved
-            elif (self._check_node_in_mesos_group(node_status) or (
+            elif (not self._check_node_in_mesos_group(node_status) or (
                     self._node_group_specified() and self._check_node_in_specified_group(node_status))):
                 if _check_node_state_online(node_status):
                     take_offline_node_list.append(node_name)
@@ -372,6 +371,10 @@ class HpcClusterManager(object):
         # type: (Iterable[str]) -> ()
         self._set_node_state(node_names, HpcState.Running, "Running")
 
+    def _set_nodes_configuring(self, node_names):
+        # type: (Iterable[str]) -> ()
+        self._set_node_state(node_names, HpcState.Configuring, "Configuring")
+
     def _set_node_state(self, node_names, node_state, state_name):
         # type: (Iterable[str], int, str) -> [(str, int)]
         set_nodes = []
@@ -478,7 +481,7 @@ class HpcClusterManager(object):
 
     def _check_node_in_mesos_group(self, node_status):
         # type: (dict[str, any]) -> bool
-        return self.MESOS_NODE_GROUP_NAME.upper() not in _upper_strings(
+        return self.MESOS_NODE_GROUP_NAME.upper() in _upper_strings(
             node_status[HpcRestClient.NODE_STATUS_NODE_GROUP_KEY])
 
     def _check_node_in_specified_group(self, node_status):
