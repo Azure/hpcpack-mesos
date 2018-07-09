@@ -47,9 +47,11 @@ class HpcRestClient(object):
     NODE_STATUS_NODE_HEALTH_UNAPPROVED_VALUE = "Unapproved"
     NODE_STATUS_NODE_GROUP_KEY = "Groups"
 
-    def __init__(self, hostname="localhost"):
+    def __init__(self, pem, hostname="localhost"):
+        # type: (str) -> None
         self.hostname = hostname
         self.logger = logging_aux.init_logger_aux("hpcframework.restclient", 'hpcframework.restclient.log')
+        self._pem = pem
 
     def _log_error(self, function_name, res):
         self.logger.error("{}: status_code:{} content:{}".format(function_name, res.status_code, res.content))
@@ -61,7 +63,7 @@ class HpcRestClient(object):
     def _get(self, function_name, function_route, params):
         headers = {"Content-Type": "application/json"}
         url = function_route.format(self.hostname)
-        res = requests.get(url, headers=headers, verify=False, params=params)
+        res = requests.get(url, headers=headers, verify=False, params=params, cert=self._pem)
         try:
             res.raise_for_status()
             self._log_info(function_name, res)
@@ -73,7 +75,7 @@ class HpcRestClient(object):
     def _post(self, function_name, function_route, data):
         headers = {"Content-Type": "application/json"}
         url = function_route.format(self.hostname)
-        res = requests.post(url, data=data, headers=headers, verify=False)
+        res = requests.post(url, data=data, headers=headers, verify=False, cert=self._pem)
         try:
             res.raise_for_status()
             self._log_info(function_name, res)
@@ -85,7 +87,7 @@ class HpcRestClient(object):
     # Starts auto-scale api
     def get_grow_decision(self, node_group_name=""):
         url = self.GROW_DECISION_API_ROUTE.format(self.hostname)
-        res = requests.post(url, verify=False)
+        res = requests.post(url, verify=False, cert=self._pem, timeout=15)
         if res.ok:
             self.logger.info(res.content)
             grow_decision_dict = {k.upper(): v for k, v in json.loads(res.content).items()}
@@ -100,6 +102,7 @@ class HpcRestClient(object):
             self.logger.error("status_code:{} content:{}".format(res.status_code, res.content))
 
     def check_nodes_idle(self, nodes):
+        # type: (list[str]) -> list[IdleNode]
         data = json.dumps(nodes)
         res = self._post(self.check_nodes_idle.__name__, self.CHECK_NODES_IDLE_ROUTE, data)
         jobjs = json.loads(res.content)
@@ -155,10 +158,10 @@ class HpcRestClient(object):
 
 
 if __name__ == '__main__':
-    client = HpcRestClient()
+    client = HpcRestClient(r"E:\Certs\testhpcfull.pem")
     ans = client.get_grow_decision()
     print ans.cores_to_grow
-    print client.check_nodes_idle(json.dumps(['mesoswinjd']))
+    print client.check_nodes_idle(['mesoswinjd'])
 
     print client.list_node_groups("MESOS")
     print client.add_node_group("Mesos", "Node Group for Compute nodes from Mesos")

@@ -40,7 +40,7 @@ class HpcpackFramwork(object):
             except KeyboardInterrupt:
                 print('Stop requested by user, stopping framework....')
 
-    def __init__(self, script_path="", setup_path="", headnode="", ssl_thumbprint="", framework_uri="", node_group=""):
+    def __init__(self, script_path, setup_path, headnode, ssl_thumbprint, client_cert, framework_uri, node_group=""):
         logging.basicConfig()
         self.logger = logging_aux.init_logger_aux("hpcframework", "hpcframework.log")
         # signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -52,7 +52,7 @@ class HpcpackFramwork(object):
         self.ssl_thumbprint = ssl_thumbprint
         self.framework_uri = framework_uri
         self.node_group = node_group
-        self.hpc_client = HpcRestClient()
+        self.hpc_client = HpcRestClient(client_cert)
         self.heartbeat_table = hpc_cluster_manager.HpcClusterManager(self.hpc_client, node_group=self.node_group)
         self.heartbeat_table.subscribe_node_closed_callback(lambda l: map(self._kill_task_by_hostname, l))
         self.heartbeat_table.start()
@@ -216,8 +216,9 @@ if __name__ == "__main__":  # TODO: heartbeat_uri can be optional parameter
     parser.add_argument("setup_path", help="Path of HPC Pack setup executable (e.g. setup.exe)")
     parser.add_argument("headnode", help="Hostname of HPC Pack cluster head node")
     parser.add_argument("ssl_thumbprint",
-                        help="Thumbprint of certificate which will be used in installtion and communication with HPC "
+                        help="Thumbprint of certificate which will be used in installation and communication with HPC "
                              "Pack cluster")
+    parser.add_argument("client_cert", help=".pem file of client cert used for HPC Management REST API authentication")
     parser.add_argument("heartbeat_uri", help="Base URI of heart beat server of HPC Pack Mesos framework")
     args = parser.parse_args()
 
