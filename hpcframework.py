@@ -227,10 +227,11 @@ if __name__ == "__main__":  # TODO: heartbeat_uri can be optional parameter
     print "setup_path: " + args.setup_path
     print "headnode: " + args.headnode
     print "ssl_thumbprint: " + args.ssl_thumbprint
+    print "client_cert: " + args.client_cert
     print "heartbeat_uri: " + args.heartbeat_uri
     if args.node_group != "":
         print "node_group: " + args.node_group
 
-    hpcpack_framework = HpcpackFramwork(args.script_path, args.setup_path, args.headnode, args.heartbeat_uri,
-                                        args.node_group)
+    hpcpack_framework = HpcpackFramwork(args.script_path, args.setup_path, args.headnode, args.ssl_thumbprint,
+                                        args.client_cert, args.heartbeat_uri, args.node_group)
     hpcpack_framework.start()
