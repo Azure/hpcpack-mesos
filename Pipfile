@@ -12,6 +12,7 @@ coverage = "*"
 requests = "*"
 mesoshttp = "*"
 typing = "*"
+pytz = "*"
 
 [requires]
 python_version = "2.7"

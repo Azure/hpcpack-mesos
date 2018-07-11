@@ -1,6 +1,7 @@
 import threading
 from datetime import datetime, timedelta
 
+import pytz
 from typing import Iterable, Callable, NamedTuple, Set, Dict, List, Tuple
 
 import logging_aux
@@ -25,7 +26,7 @@ def _check_node_health_unapproved(node_status):
 
 def _find_missing_nodes(rq_nodes, res_nodes):
     # type: (List[str], List[str]) -> List[str]
-    return [name for name in rq_nodes if name not in res_nodes]
+    return [name for name in _upper_strings(rq_nodes) if name not in _upper_strings(res_nodes)]
 
 
 def _check_node_state(node_status, target_state):
@@ -97,7 +98,7 @@ class HpcClusterManager(object):
         # type: (Callable[[list[str]], ()]) -> ()
         self._node_closed_callbacks.append(callback)
 
-    def add_slaveinfo(self, fqdn, agent_id, task_id, cpus, last_heartbeat=datetime.utcnow()):
+    def add_slaveinfo(self, fqdn, agent_id, task_id, cpus, last_heartbeat=datetime.now(pytz.utc)):
         # type: (str, str, str, float, datetime) -> ()
         u_fqdn = fqdn.upper()
         hostname = _get_hostname_from_fqdn(u_fqdn)
@@ -114,7 +115,7 @@ class HpcClusterManager(object):
         self._heart_beat_table[hostname] = slaveinfo
         self.logger.info("Heart beat entry added: {}".format(str(slaveinfo)))
 
-    def on_slave_heartbeat(self, hostname, now=datetime.utcnow()):
+    def on_slave_heartbeat(self, hostname, now=datetime.now(pytz.utc)):
         # type: (str, datetime) -> ()
         u_hostname = hostname.upper()
         if u_hostname in self._heart_beat_table:
@@ -123,7 +124,7 @@ class HpcClusterManager(object):
             if self._heart_beat_table[u_hostname].state == HpcState.Provisioning:
                 with self._table_lock:
                     if self._heart_beat_table[u_hostname].state == HpcState.Provisioning:
-                        self._set_nodes_configuring(u_hostname)
+                        self._set_nodes_configuring([u_hostname])
         else:
             self.logger.error("Host {} is not recognized. Heartbeat ignored.".format(u_hostname))
             self.logger.debug("_table {} ".format(self._heart_beat_table))
@@ -165,7 +166,7 @@ class HpcClusterManager(object):
                 return True
         return False
 
-    def _check_timeout(self, now=datetime.utcnow()):
+    def _check_timeout(self, now=datetime.now(pytz.utc)):
         # type: (datetime) -> ([SlaveInfo], [SlaveInfo], [SlaveInfo])
         # TODO: Check configuring timeout
         provision_timeout_list = []
@@ -276,8 +277,8 @@ class HpcClusterManager(object):
             self.logger.info("Nodes configured: {}".format(configured_node_names))
             self._set_nodes_running(configured_node_names)
         if missing_nodes:
+            # Missing is valid state of nodes in configuring.
             self.logger.info("Nodes missing when configuring: {}".format(missing_nodes))
-            self._set_nodes_closed(missing_nodes)
 
     def _check_runaway_and_idle_compute_nodes(self):
         # type: () -> ()
@@ -312,7 +313,7 @@ class HpcClusterManager(object):
             self.logger.info("Get idle_timeout_nodes:{}".format(str(idle_timeout_nodes)))
             self._set_nodes_draining(idle_timeout_nodes)
 
-    def _check_node_idle_timeout(self, node_names, now=datetime.utcnow()):
+    def _check_node_idle_timeout(self, node_names, now=datetime.now(pytz.utc)):
         # type: (Iterable[str], datetime) -> [str]
         new_node_idle_check_table = {}
         for u_node_name in _upper_strings(node_names):
@@ -325,6 +326,7 @@ class HpcClusterManager(object):
             else:
                 new_node_idle_check_table[u_node_name] = now
         self._node_idle_check_table = new_node_idle_check_table
+        self.logger.info("_check_node_idle_timeout: now - " + str(now))
         self.logger.info("_check_node_idle_timeout: " + str(self._node_idle_check_table))
         return [name for name, value in self._node_idle_check_table.iteritems() if
                 (now - value) >= self._node_idle_timedelta]
