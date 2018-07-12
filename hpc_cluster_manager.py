@@ -98,8 +98,10 @@ class HpcClusterManager(object):
         # type: (Callable[[list[str]], ()]) -> ()
         self._node_closed_callbacks.append(callback)
 
-    def add_slaveinfo(self, fqdn, agent_id, task_id, cpus, last_heartbeat=datetime.now(pytz.utc)):
+    def add_slaveinfo(self, fqdn, agent_id, task_id, cpus, last_heartbeat=None):
         # type: (str, str, str, float, datetime) -> ()
+        if last_heartbeat is None:
+            last_heartbeat = datetime.now(pytz.utc)
         u_fqdn = fqdn.upper()
         hostname = _get_hostname_from_fqdn(u_fqdn)
         if hostname in self._heart_beat_table:
@@ -115,8 +117,10 @@ class HpcClusterManager(object):
         self._heart_beat_table[hostname] = slaveinfo
         self.logger.info("Heart beat entry added: {}".format(str(slaveinfo)))
 
-    def on_slave_heartbeat(self, hostname, now=datetime.now(pytz.utc)):
+    def on_slave_heartbeat(self, hostname, now=None):
         # type: (str, datetime) -> ()
+        if now is None:
+            now = datetime.now(pytz.utc)
         u_hostname = hostname.upper()
         if u_hostname in self._heart_beat_table:
             self._heart_beat_table[u_hostname] = self._heart_beat_table[u_hostname]._replace(last_heartbeat=now)
@@ -166,9 +170,11 @@ class HpcClusterManager(object):
                 return True
         return False
 
-    def _check_timeout(self, now=datetime.now(pytz.utc)):
+    def _check_timeout(self, now=None):
         # type: (datetime) -> ([SlaveInfo], [SlaveInfo], [SlaveInfo])
         # TODO: Check configuring timeout
+        if now is None:
+            now = datetime.now(pytz.utc)
         provision_timeout_list = []
         heartbeat_timeout_list = []
         running_list = []
@@ -313,8 +319,10 @@ class HpcClusterManager(object):
             self.logger.info("Get idle_timeout_nodes:{}".format(str(idle_timeout_nodes)))
             self._set_nodes_draining(idle_timeout_nodes)
 
-    def _check_node_idle_timeout(self, node_names, now=datetime.now(pytz.utc)):
+    def _check_node_idle_timeout(self, node_names, now=None):
         # type: (Iterable[str], datetime) -> [str]
+        if now is None:
+            now = datetime.now(pytz.utc)
         new_node_idle_check_table = {}
         for u_node_name in _upper_strings(node_names):
             if u_node_name in self._node_idle_check_table:
