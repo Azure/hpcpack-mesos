@@ -56,7 +56,7 @@ def create_mock_mesos_offer(cpus, max_cores, is_windows, hostname):
 
 class HpcFrameworkUnitTest(unittest.TestCase):
     def setUp(self):
-        self.hpcpackFramework = hpcframework.HpcpackFramwork()
+        self.hpcpackFramework = hpcframework.HpcpackFramwork("", "", "", "", "", "", "")
 
     @patch('hpcframework.HpcpackFramwork.decline_offer')
     @patch('hpcframework.HpcpackFramwork.accept_offer')

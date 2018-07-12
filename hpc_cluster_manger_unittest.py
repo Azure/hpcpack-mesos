@@ -1,6 +1,7 @@
 import datetime
 import unittest
 
+import pytz
 from mock import patch, MagicMock
 
 from hpc_cluster_manager import HpcClusterManager, HpcState
@@ -22,20 +23,7 @@ HOST3HOSTNAME = "host3hostname"
 
 ZERODELTA = datetime.timedelta(0)
 
-
-class UTCtzinfo(datetime.tzinfo):
-    def utcoffset(self, dt):
-        return ZERODELTA
-
-    def tzname(self, dt):
-        return "UTC"
-
-    def dst(self, dt):
-        return ZERODELTA
-
-
-utc = UTCtzinfo()
-UTCNOW = datetime.datetime(2018, 1, 1, 12, 0, 0, 0, tzinfo=utc)
+UTCNOW = datetime.datetime(2018, 1, 1, 12, 0, 0, 0, tzinfo=pytz.utc)
 TENMINUTES = datetime.timedelta(minutes=10)
 ONESEC = datetime.timedelta(seconds=1)
 
@@ -222,6 +210,13 @@ class HeartbeatTableUnitTest(unittest.TestCase):
         clusmgr = HpcClusterManager(mock_restc, provisioning_timeout=TENMINUTES)
         clusmgr.add_slaveinfo(HOST1HOSTNAME, HOST1AGENTID, HOST1TASKID1, 1, UTCNOW)
         res, _, _ = clusmgr._check_timeout(UTCNOW + TENMINUTES)
+        self.assertTrue(res)
+
+    @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
+    def test_provisioning_time_out_positive2(self, mock_restc):
+        clusmgr = HpcClusterManager(mock_restc)
+        clusmgr.add_slaveinfo(HOST1HOSTNAME, HOST1AGENTID, HOST1TASKID1, 1, UTCNOW)
+        res, _, _ = clusmgr._check_timeout()
         self.assertTrue(res)
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
