@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Job Version="3.000" Id="30" State="Finished" SubmitTime="7/16/2018 6:31:32 AM" CreateTime="7/16/2018 6:31:30 AM" StartTime="7/16/2018 6:32:23 AM" Name="NeedNg1" IsExclusive="false" RunUntilCanceled="false" UnitType="Core" Owner="HPC\hpcadmin" UserName="HPC\hpcadmin" Project="" JobType="Batch" JobTemplate="Default" Priority="Normal" NodeGroups="NodeGroup1" OrderBy="" RequeueCount="0" AutoRequeueCount="0" PendingReason="None" AutoCalculateMax="true" AutoCalculateMin="true" FailOnTaskFailure="false" Progress="100" ProgressMessage="" MinCores="1" MaxCores="1" NotifyOnStart="false" NotifyOnCompletion="false" NodeGroupOp="Intersect" JobValidExitCodes="0" ParentJobIds="" EstimatedProcessMemory="0" TaskExecutionFailureRetryLimit="0" xmlns="http://schemas.microsoft.com/HPCS2008R2/scheduler/">
+    <Dependencies />
+    <Tasks>
+        <Task Version="3.000" Id="28" ParentJobId="30" State="Finished" UnitType="Core" NiceId="1" CommandLine="ping localhost -n 11 &amp; hostname" RequeueCount="0" PendingReason="None" StartValue="0" EndValue="0" IncrementValue="1" GroupId="30" SubmitTime="7/16/2018 6:31:32 AM" StartTime="7/16/2018 6:32:23 AM" CreateTime="7/16/2018 6:31:30 AM" Name="My Task" MinCores="1" MaxCores="1" AutoRequeueCount="0" Type="Basic" FailJobOnFailure="false" />
+    </Tasks>
+</Job>
