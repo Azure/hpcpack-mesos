@@ -4,9 +4,9 @@ $scriptRoot = $PSScriptRoot
 Describe "HPC Mesos Integration Test" {
     Context "Basic 1 node Grow Shrink" {
         It "checks no nodes online at the begining" {
-            $retries = 60
+            $retries = 180
             while ($retries -gt 0) {
-                $nodes = Get-HpcNode -State Online
+                $nodes = Get-HpcNode -State Online -ErrorAction SilentlyContinue
                 $ans = $nodes.Count
                 if ($ans -eq 0) {
                     break
@@ -21,7 +21,7 @@ Describe "HPC Mesos Integration Test" {
             $1CoreJobXml = Join-Path $scriptRoot "JobXml\1Core.Xml"
             $job = New-HpcJob -JobFile $1CoreJobXml
             Submit-HpcJob -Job $job
-            $retries = 60
+            $retries = 180
             while ($retries -gt 0) {
                 $job.Refresh()
                 $ans = $job.State -eq "Finished"
@@ -35,14 +35,14 @@ Describe "HPC Mesos Integration Test" {
         }
 
         It "checks if over grown" {
-            $nodes = Get-HpcNode -State Online
+            $nodes = Get-HpcNode -State Online -ErrorAction SilentlyContinue
             $nodes.Count | Should -Be 1
         }
 
         It "checks nodes get shrunk in the end" {
-            $retries = 60
+            $retries = 180
             while ($retries -gt 0) {
-                $nodes = Get-HpcNode -State Online
+                $nodes = Get-HpcNode -State Online -ErrorAction SilentlyContinue
                 $ans = $nodes.Count
                 if ($ans -eq 0) {
                     break
@@ -54,11 +54,11 @@ Describe "HPC Mesos Integration Test" {
         }
     }
 
-    Context "Basic 9 node Grow Shrink" {
+    Context "Basic 2 nodes Grow Shrink" {
         It "checks no nodes online at the begining" {
-            $retries = 60
+            $retries = 180
             while ($retries -gt 0) {
-                $nodes = Get-HpcNode -State Online
+                $nodes = Get-HpcNode -State Online -ErrorAction SilentlyContinue
                 $ans = $nodes.Count
                 if ($ans -eq 0) {
                     break
@@ -73,7 +73,7 @@ Describe "HPC Mesos Integration Test" {
             $1CoreJobXml = Join-Path $scriptRoot "JobXml\9Cores.Xml"
             $job = New-HpcJob -JobFile $1CoreJobXml
             Submit-HpcJob -Job $job
-            $retries = 60
+            $retries = 180
             while ($retries -gt 0) {
                 $job.Refresh()
                 $ans = $job.State -eq "Finished"
@@ -87,14 +87,14 @@ Describe "HPC Mesos Integration Test" {
         }
 
         It "checks if over grown" {
-            $nodes = Get-HpcNode -State Online
+            $nodes = Get-HpcNode -State Online -ErrorAction SilentlyContinue
             $nodes.Count | Should -Be 2
         }
 
         It "checks nodes get shrunk in the end" {
-            $retries = 60
+            $retries = 180
             while ($retries -gt 0) {
-                $nodes = Get-HpcNode -State Online
+                $nodes = Get-HpcNode -State Online -ErrorAction SilentlyContinue
                 $ans = $nodes.Count
                 if ($ans -eq 0) {
                     break
@@ -108,9 +108,9 @@ Describe "HPC Mesos Integration Test" {
 
     Context "1 node required node group Grow Shrink" {
         It "checks no nodes online at the begining" {
-            $retries =60
+            $retries = 180
             while ($retries -gt 0) {
-                $nodes = Get-HpcNode -State Online
+                $nodes = Get-HpcNode -State Online -ErrorAction SilentlyContinue
                 $ans = $nodes.Count
                 if ($ans -eq 0) {
                     break
@@ -125,7 +125,7 @@ Describe "HPC Mesos Integration Test" {
             $1CoreJobXml = Join-Path $scriptRoot "JobXml\NeedNg1.Xml"
             $job = New-HpcJob -JobFile $1CoreJobXml
             Submit-HpcJob -Job $job
-            $retries = 60
+            $retries = 180
             while ($retries -gt 0) {
                 $job.Refresh()
                 $ans = $job.State -eq "Finished"
@@ -139,14 +139,14 @@ Describe "HPC Mesos Integration Test" {
         }
 
         It "checks if over grown" {
-            $nodes = Get-HpcNode -State Online
+            $nodes = Get-HpcNode -State Online -ErrorAction SilentlyContinue
             $nodes.Count | Should -Be 1
         }
 
         It "checks nodes get shrunk in the end" {
-            $retries = 60
+            $retries = 180
             while ($retries -gt 0) {
-                $nodes = Get-HpcNode -State Online
+                $nodes = Get-HpcNode -State Online -ErrorAction SilentlyContinue
                 $ans = $nodes.Count
                 if ($ans -eq 0) {
                     break
