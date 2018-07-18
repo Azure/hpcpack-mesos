@@ -317,7 +317,9 @@ class HpcClusterManager(object):
             self.logger.info("Get idle_nodes:{}".format(str(idle_nodes)))
             idle_timeout_nodes = self._check_node_idle_timeout([node.node_name for node in idle_nodes])
             self.logger.info("Get idle_timeout_nodes:{}".format(str(idle_timeout_nodes)))
-            self._set_nodes_draining(idle_timeout_nodes)
+            # If there is still node growing, we won't shrink at the same time
+            if self.get_cores_in_provisioning() <= 0.0:
+                self._set_nodes_draining(idle_timeout_nodes)
 
     def _check_node_idle_timeout(self, node_names, now=None):
         # type: (Iterable[str], datetime) -> [str]
