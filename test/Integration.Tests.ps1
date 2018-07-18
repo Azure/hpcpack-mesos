@@ -54,6 +54,8 @@ Describe "HPC Mesos Integration Test" {
         }
     }
 
+    Start-Sleep 60
+
     Context "Basic 2 nodes Grow Shrink" {
         It "checks no nodes online at the begining" {
             $retries = 180
@@ -105,6 +107,8 @@ Describe "HPC Mesos Integration Test" {
             $ans | Should -Be 0
         }
     }
+
+    Start-Sleep 60
 
     Context "1 node required node group Grow Shrink" {
         It "checks no nodes online at the begining" {
