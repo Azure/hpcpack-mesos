@@ -1,4 +1,6 @@
 # HPC Pack MESOS framework
+[![Build Status](https://travis-ci.org/amat27/hpcpack-mesos.svg?branch=master)](https://travis-ci.org/amat27/hpcpack-mesos)
+
 A MESOS scheduler framework which accepts offers from MESOS master and builds HPC Pack compute nodes for existing HPC cluster.
 
 ## Install
