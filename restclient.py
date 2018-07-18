@@ -155,18 +155,3 @@ class HpcRestClient(object):
         res = self._post(self.add_node_to_node_group.__name__, self.ADD_NODES_TO_NODE_GROUP_ROUTE.format(
             group_name=group_name), json.dumps(node_names))
         return _return_json_from_res(res)
-
-
-if __name__ == '__main__':
-    client = HpcRestClient(r"E:\Certs\testhpcfull.pem")
-    ans = client.get_grow_decision()
-    print ans.cores_to_grow
-    print client.check_nodes_idle(['mesoswinjd'])
-
-    print client.list_node_groups("MESOS")
-    print client.add_node_group("Mesos", "Node Group for Compute nodes from Mesos")
-    print client.add_node_to_node_group("mesos", ["mesoswinjd"])
-    # print client.bring_nodes_online(['mesoswinjd'])
-    # print client.assign_nodes_template(['iaascn000'], client.DEFAULT_COMPUTENODE_TEMPLATE)
-
-    print client.get_node_status_exact(["mesoswinjd"])
