@@ -173,7 +173,7 @@ class HpcClusterManager(object):
         return False
 
     def _check_timeout(self, now=None):
-        # type: (datetime) -> ([SlaveInfo], [SlaveInfo], [SlaveInfo])
+        # type: (datetime) -> ([SlaveInfo], [SlaveInfo])
         # TODO: Check configuring timeout
         if now is None:
             now = datetime.now(pytz.utc)

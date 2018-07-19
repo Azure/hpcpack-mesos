@@ -191,21 +191,21 @@ class HeartbeatTableUnitTest(unittest.TestCase):
     def test_provisioning_time_out_negative(self, mock_restc):
         clusmgr = HpcClusterManager(mock_restc, provisioning_timeout=TENMINUTES)
         clusmgr.add_slaveinfo(HOST1HOSTNAME, HOST1AGENTID, HOST1TASKID1, 1, UTCNOW)
-        res, _, _ = clusmgr._check_timeout(UTCNOW + TENMINUTES - ONESEC)
+        res, _ = clusmgr._check_timeout(UTCNOW + TENMINUTES - ONESEC)
         self.assertFalse(res)
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
     def test_provisioning_time_out_positive(self, mock_restc):
         clusmgr = HpcClusterManager(mock_restc, provisioning_timeout=TENMINUTES)
         clusmgr.add_slaveinfo(HOST1HOSTNAME, HOST1AGENTID, HOST1TASKID1, 1, UTCNOW)
-        res, _, _ = clusmgr._check_timeout(UTCNOW + TENMINUTES)
+        res, _ = clusmgr._check_timeout(UTCNOW + TENMINUTES)
         self.assertTrue(res)
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
     def test_provisioning_time_out_positive2(self, mock_restc):
         clusmgr = HpcClusterManager(mock_restc)
         clusmgr.add_slaveinfo(HOST1HOSTNAME, HOST1AGENTID, HOST1TASKID1, 1, UTCNOW)
-        res, _, _ = clusmgr._check_timeout()
+        res, _ = clusmgr._check_timeout()
         self.assertTrue(res)
 
     @patch("hpc_cluster_manager.HpcRestClient", autospec=True)
