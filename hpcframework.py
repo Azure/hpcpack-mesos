@@ -9,7 +9,6 @@ from mesoshttp.offers import Offer
 
 import hpc_cluster_manager
 import logging_aux
-import restserver
 from restclient import HpcRestClient
 
 
@@ -71,12 +70,10 @@ class HpcpackFramwork(object):
         self.mesos_client.on(MesosClient.OFFERS, self.offer_received)
         self.mesos_client.on(MesosClient.UPDATE, self.status_update)
         self.th = HpcpackFramwork.MesosFramework(self.mesos_client)
-        self.heartbeat_server = restserver.HeartBeatServer(self.heartbeat_table, self.listen_port)
         self.stop = False
 
     def start(self):
         self.th.start()
-        self.heartbeat_server.start()
         while True and self.th.isAlive():
             try:
                 self.th.join(1)
