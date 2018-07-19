@@ -39,8 +39,7 @@ class HpcpackFramwork(object):
             except KeyboardInterrupt:
                 print('Stop requested by user, stopping framework....')
 
-    def __init__(self, script_path, setup_path, headnode, ssl_thumbprint, client_cert, framework_uri, listen_port,
-                 node_group=""):
+    def __init__(self, script_path, setup_path, headnode, ssl_thumbprint, client_cert, node_group=""):
         logging.basicConfig()
         self.logger = logging_aux.init_logger_aux("hpcframework", "hpcframework.log")
         # signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -50,8 +49,6 @@ class HpcpackFramwork(object):
         self.setup_path = setup_path
         self.headnode = headnode
         self.ssl_thumbprint = ssl_thumbprint
-        self.framework_uri = framework_uri
-        self.listen_port = listen_port
         self.node_group = node_group
         self.hpc_client = HpcRestClient(client_cert)
         self.heartbeat_table = hpc_cluster_manager.HpcClusterManager(self.hpc_client, node_group=self.node_group)
@@ -93,7 +90,6 @@ class HpcpackFramwork(object):
         self.driver.tearDown()
         self.mesos_client.stop = True
         self.stop = True
-        self.heartbeat_server.stop()
 
     def subscribed(self, driver):
         self.logger.warn('SUBSCRIBED')
@@ -187,7 +183,6 @@ class HpcpackFramwork(object):
             'command': {'value':
                             'powershell -File ' + self.script_path + " -setupPath " + self.setup_path +
                             " -headnode " + self.headnode + " -sslthumbprint " + self.ssl_thumbprint +
-                            " -frameworkUri " + self.framework_uri + " -port " + str(self.listen_port) +
                             " > setupscript.log"}
         }
         self.logger.debug("Sending command:\n{}".format(task['command']['value']))
@@ -213,8 +208,6 @@ if __name__ == "__main__":  # TODO: heartbeat_uri can be optional parameter
     parser = argparse.ArgumentParser(description="HPC Pack Mesos framework")
     parser.add_argument("-g", "--node_group", default="",
                         help="The node group in which we need to perform grow-shrink.")
-    parser.add_argument("-p", "--listen_port", default=8088, type=int,
-                        help="The port to which Mesos slave heart beat will send back")
     parser.add_argument("script_path", help="Path of HPC Pack Mesos slave setup script (e.g. setupscript.ps1)")
     parser.add_argument("setup_path", help="Path of HPC Pack setup executable (e.g. setup.exe)")
     parser.add_argument("headnode", help="Hostname of HPC Pack cluster head node")
@@ -222,7 +215,6 @@ if __name__ == "__main__":  # TODO: heartbeat_uri can be optional parameter
                         help="Thumbprint of certificate which will be used in installation and communication with HPC "
                              "Pack cluster")
     parser.add_argument("client_cert", help=".pem file of client cert used for HPC Management REST API authentication")
-    parser.add_argument("heartbeat_uri", help="Base URI of heart beat server of HPC Pack Mesos framework")
     args = parser.parse_args()
 
     print "Input arguments:"
@@ -231,11 +223,9 @@ if __name__ == "__main__":  # TODO: heartbeat_uri can be optional parameter
     print "headnode: " + args.headnode
     print "ssl_thumbprint: " + args.ssl_thumbprint
     print "client_cert: " + args.client_cert
-    print "heartbeat_uri: " + args.heartbeat_uri
-    print "listen_port: " + str(args.listen_port)
     if args.node_group != "":
         print "node_group: " + args.node_group
 
     hpcpack_framework = HpcpackFramwork(args.script_path, args.setup_path, args.headnode, args.ssl_thumbprint,
-                                        args.client_cert, args.heartbeat_uri, args.listen_port, args.node_group)
+                                        args.client_cert, args.node_group)
     hpcpack_framework.start()

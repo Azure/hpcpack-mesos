@@ -1,4 +1,4 @@
-param ([string]$setupPath = "C:\HPCPack2016\setup.exe", [string]$headnode = "", [string]$sslthumbprint = "", [string]$frameworkUri = "localhost", [string]$port = "8088")
+param ([string]$setupPath = "C:\HPCPack2016\setup.exe", [string]$headnode = "", [string]$sslthumbprint = "")
 
 $createdMutex = ""
 $mutex = New-Object -TypeName system.threading.mutex($true, "Global\HpcMesos", [ref]$CreatedMutex)
@@ -19,7 +19,6 @@ schtasks /run /tn mesoshpcdaemon
 
 $setupPath
 $setupProc = Start-Process $setupPath -ArgumentList "-unattend -computenode:$headnode -sslthumbprint:$sslthumbprint" -PassThru
-#$setupProc = Start-Process "C:\HPCPack2016\private.20180308.251b491.release.debug\release.debug\setup.exe" -ArgumentList "-unattend -computenode:mesoswinagent -sslthumbprint:0386B1198B956BBAAA4154153B6CA1F44B6D1016" -PassThru
 $setupProc.WaitForExit()
 
 Write-Output "Set CCP_ env vars and registry"
@@ -53,10 +52,6 @@ sc.exe start HpcNodeManager
 sc.exe start HpcSoaDiagMon
 sc.exe start HpcBroker
 
-$heartBeatParams = @{ "hostname" = hostname } | ConvertTo-Json
-$url = "http://" + $frameworkUri + ":" + $port
-$url
-
 while ($true)
 {
     try
@@ -67,9 +62,6 @@ while ($true)
             Write-Output "Daemon script not found. Restart."
             schtasks /run /tn mesoshpcdaemon
         }
-
-        Write-Output "Send HeartBeat to"  $url
-        Invoke-WebRequest -Method Post $url -Body $heartBeatParams
     }
     catch
     {
