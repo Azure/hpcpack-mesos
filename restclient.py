@@ -2,10 +2,13 @@ import json
 from collections import namedtuple
 
 import requests
+import urllib3
 from requests.exceptions import HTTPError
 from typing import Iterable
 
 import logging_aux
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 GrowDecision = namedtuple("GrowDecision", "cores_to_grow nodes_to_grow sockets_to_grow")
 IdleNode = namedtuple("IdleNode", "node_name timestamp server_name")
