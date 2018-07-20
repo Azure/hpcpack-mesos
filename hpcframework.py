@@ -2,10 +2,12 @@ import base64
 import codecs
 import logging
 import threading
+import time
 import uuid
 
 from mesoshttp.client import MesosClient
 from mesoshttp.offers import Offer
+from typing import List
 
 import hpc_cluster_manager
 import logging_aux
@@ -101,6 +103,8 @@ class HpcpackFramwork(object):
         self.logger.info("Update received:\n{}".format(str(update)))
 
     def offer_received(self, offers):
+        handled_offer = []  # type: List[Offer]
+
         try:
             # self.logger.info('OFFER: %s' % (str(offers)))
             if self.node_group == "":
@@ -142,13 +146,31 @@ class HpcpackFramwork(object):
                 if take_offer:
                     cores_to_grow -= cpus
                     self.accept_offer(offer)
+                    handled_offer.append(offer)
                 else:
                     self.decline_offer(offer)
+                    handled_offer.append(offer)
 
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception as ex:
             self.logger.exception(ex)
+        finally:
+            # We have to either accept or decline an offer
+            # TODO: Retry in a separate thread
+            while True:
+                try:
+                    if not offers:
+                        return
+                    else:
+                        to_decline = [offer for offer in offers if offer not in handled_offer]
+                        for offer in to_decline:
+                            self.decline_offer(offer)
+                            handled_offer.append(offer)
+                        return
+                except Exception as ex:
+                    self.logger.exception(ex)
+                    time.sleep(10)
 
     def decline_offer(self, offer):
         self.logger.info("Decline offer %s" % offer.get_offer()['id']['value'])
