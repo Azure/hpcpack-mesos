@@ -338,9 +338,12 @@ class HpcClusterManager(object):
 
     def _start_configure_cluster_timer(self):
         # type: () -> ()
-        self._provision_compute_nodes_state_machine()
-        self._check_runaway_and_idle_compute_nodes()
-        self._drain_and_stop_nodes()
+        try:
+            self._provision_compute_nodes_state_machine()
+            self._check_runaway_and_idle_compute_nodes()
+            self._drain_and_stop_nodes()
+        except Exception as ex:
+            self.logger.exception(ex)
         timer = threading.Timer(self.CHECK_CONFIGURING_NODES_INTERVAL, self._start_configure_cluster_timer)
         timer.daemon = True
         timer.start()
