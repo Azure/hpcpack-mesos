@@ -140,7 +140,8 @@ class HpcpackFramwork(object):
                             if match_node_group:
                                 cores = get_scalar(attributes, 'cores')
                                 cpus = get_scalar(offer_dict['resources'], 'cpus')
-                                if cores == cpus:
+                                # work around of MESOS-8631
+                                if cpus >= cores - 0.1:
                                     if not self.heartbeat_table.check_fqdn_collision(offer_dict['hostname']):
                                         take_offer = True
                 if take_offer:
@@ -185,6 +186,13 @@ class HpcpackFramwork(object):
         task_id = uuid.uuid4().hex
         cpus = get_scalar(offer_dict['resources'], 'cpus')
 
+        # work around of MESOS-8631
+        if 'attributes' in offer_dict:
+            attributes = offer_dict['attributes']
+            cores = get_scalar(attributes, 'cores')
+        else:
+            cores = cpus
+
         task = {
             'name': 'hpc pack mesos cn',
             'task_id': {'value': task_id},
@@ -194,7 +202,7 @@ class HpcpackFramwork(object):
                     'name': 'cpus',
                     'type': 'SCALAR',
                     # work around of MESOS-8631
-                    'scalar': {'value': cpus - 0.1}
+                    'scalar': {'value': cores - 0.1}
                 },
                 {
                     'name': 'mem',
