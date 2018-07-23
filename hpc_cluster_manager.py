@@ -305,16 +305,26 @@ class HpcClusterManager(object):
                 self.logger.warn("Missing nodes in running state:{}".format(missing_nodes))
                 self._set_nodes_closed(missing_nodes)
 
-            # Update running node names to remove closed nodes
-            running_node_names = [name for name in running_node_names if
-                                  (name not in unapproved_nodes and name not in missing_nodes)]
-            idle_nodes = self._hpc_client.check_nodes_idle(running_node_names)
-            self.logger.info("Get idle_nodes:{}".format(str(idle_nodes)))
-            idle_timeout_nodes = self._check_node_idle_timeout([node.node_name for node in idle_nodes])
-            self.logger.info("Get idle_timeout_nodes:{}".format(str(idle_timeout_nodes)))
-            # If there is still node growing, we won't shrink at the same time
             if self.get_cores_in_provisioning() <= 0.0:
+                # Update running node names to remove closed nodes
+                running_node_names = [name for name in running_node_names if
+                                      (name not in unapproved_nodes and name not in missing_nodes)]
+                idle_nodes = self._hpc_client.check_nodes_idle(running_node_names)
+                self.logger.info("Get idle_nodes:{}".format(str(idle_nodes)))
+                idle_timeout_nodes = self._check_node_idle_timeout([node.node_name for node in idle_nodes])
+                self.logger.info("Get idle_timeout_nodes:{}".format(str(idle_timeout_nodes)))
                 self._set_nodes_draining(idle_timeout_nodes)
+            else:
+                # If there is still node growing, we won't shrink at the same time
+                self._reset_node_idle_check()
+                self.logger.info(
+                    "Reset node idle timeout as there are nodes being provisioning. Cores in provisioning: {}".format(
+                        self.get_cores_in_provisioning()))
+
+    def _reset_node_idle_check(self):
+        # type: () -> ()
+        self._node_idle_check_table.clear()
+        self._removed_nodes.clear()
 
     def _check_node_idle_timeout(self, node_names, now=None):
         # type: (Iterable[str], datetime) -> [str]
