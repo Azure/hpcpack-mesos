@@ -1,5 +1,5 @@
 # HPC Pack MESOS Framework
-[![Build Status](https://travis-ci.org/Azure/hpcpack-mesos.svg?branch=master)](https://travis-ci.org/Azure/hpcpack-mesos)
+[![Build Status](https://travis-ci.org/amat27/hpcpack-mesos.svg?branch=master)](https://travis-ci.org/amat27/hpcpack-mesos)
 
 A MESOS scheduler framework, which accepts offers from MESOS master and builds HPC Pack compute nodes for existing HPC cluster.
 
@@ -43,20 +43,6 @@ HPC Pack Mesos Framework
     -g NODE_GROUP, --node_group NODE_GROUP
                             The node group in which we need to perform grow-shrink.
 
-## Contributing
-
-This project welcomes contributions and suggestions. Most contributions require you to
-agree to a Contributor License Agreement (CLA) declaring that you have the right to,
-and actually do, grant us the rights to use your contribution. For details, visit
-https://cla.microsoft.com.
-
-When you submit a pull request, a CLA-bot will automatically determine whether you need
-to provide a CLA and decorate the PR appropriately (e.g., label, comment). Simply follow the
-instructions provided by the bot. You will only need to do this once across all repositories using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/)
-or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
 ## FAQ
 #### Convert .pfx to .pem using [OpenSSL](https://github.com/openssl/openssl)
