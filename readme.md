@@ -15,7 +15,10 @@ HPC Pack Mesos Framework
 - Returns HPC Pack compute nodes to Mesos cluster, if
     - The node reached idle time out of Mesos framework
 
-## Installation
+## Get Started
+See [HPC Pack Mesos Integration Step By Step](https://docs.microsoft.com/en-us/powershell/high-performance-computing/hpc-pack-mesos-integration-step-by-step)
+
+## Simple Installation Guide
 #### Dependency
 * Python 2.7
 * pipenv
