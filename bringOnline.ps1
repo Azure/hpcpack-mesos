@@ -20,7 +20,7 @@ while (!$broughtOnline -and $retryCount -gt 0) {
     }           
 }
 
-Write-Output "Brought node online. Waiting for node being reacheable."
+Write-Output "Brought node online. Waiting for node being reachable."
 
 $retryCount = 180
 $okState = [Microsoft.ComputeCluster.CCPPSH.NodeHealthState]::OK
